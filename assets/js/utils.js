@@ -172,42 +172,38 @@ function getTimeBasedGreeting() {
  * @param {boolean} includeCredentials - Whether to include credentials (cookies)
  * @returns {Promise} - Promise that resolves to the API response
  */
-async function apiRequest(endpoint, options = {}) {
-    // Get auth token from sessionStorage
-    const authToken = sessionStorage.getItem('auth_token');
-    
-    // Prepare headers with Authorization token if available
-    const headers = {
+async function apiRequest(endpoint, options = {}, includeCredentials = true) {
+    const defaultHeaders = {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(options.headers || {})
+        'Accept': 'application/json'
     };
-    
-    if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-    }
-    
-    // Prepare request config
+
     const config = {
         ...options,
-        headers: headers,
-        credentials: 'include'
+        headers: {
+            ...defaultHeaders,
+            ...(options.headers || {}),
+        }
     };
     
+    if (includeCredentials) {
+        config.credentials = 'include';
+    }
+    
     try {
-        // Make the request
-        const response = await fetch(`https://auth.kdj.lk/api/v1${endpoint}`, config);
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
         
-        // If unauthorized, redirect to login
+        // Handle unauthorized error by redirecting to login
         if (response.status === 401) {
-            console.error('Authentication failed:', response.status);
-            window.location.href = '/index.php';
-            throw new Error('Authentication failed');
+            // Save current URL to redirect back after login
+            sessionStorage.setItem('redirectAfterLogin', window.location.href);
+            window.location.href = 'index.php';
+            throw new Error('Unauthorized');
         }
         
         return response;
     } catch (error) {
-        console.error(`API request error to ${endpoint}:`, error);
+        console.error(`API call to ${endpoint} failed:`, error);
         throw error;
     }
 }

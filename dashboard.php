@@ -358,50 +358,33 @@ $additional_scripts = <<<HTML
     
     // Load user profile data
     async function loadUserProfile() {
-    try {
-        showLoading();
-        
-        // Get auth token from sessionStorage
-        const authToken = sessionStorage.getItem('auth_token');
-        
-        // Set up request headers with Authorization token
-        const headers = {
-            'Accept': 'application/json'
-        };
-        
-        if (authToken) {
-            headers['Authorization'] = `Bearer ${authToken}`;
-        }
-        
-        const response = await fetch(`${apiBaseUrl}/users/me`, {
-            method: 'GET',
-            headers: headers,
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to fetch profile');
-        }
-        
-        userData = await response.json();
-        
-        // Update profile display
-        updateProfileDisplay(userData);
-        
-        hideLoading();
-    } catch (error) {
-        hideLoading();
-        console.error('Failed to load user profile:', error);
-        showToast('Failed to load profile data. Please try refreshing the page.', 'error');
-        
-        // If authentication error, redirect to login
-        if (error.message.includes('Failed to fetch profile')) {
-            setTimeout(() => {
-                window.location.href = '/index.php';
-            }, 2000);
+        try {
+            showLoading();
+            
+            const response = await fetch(`\${apiBaseUrl}/users/me`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch profile');
+            }
+            
+            userData = await response.json();
+            
+            // Update profile display
+            updateProfileDisplay(userData);
+            
+            hideLoading();
+        } catch (error) {
+            hideLoading();
+            console.error('Failed to load user profile:', error);
+            showToast('Failed to load profile data. Please try refreshing the page.', 'error');
         }
     }
-}
     
     // Update profile display with user data
     function updateProfileDisplay(user) {

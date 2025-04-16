@@ -147,53 +147,41 @@
         
         // Check if user is logged in by trying to fetch profile
         function checkUserAuth() {
-    if (window.location.pathname.includes('dashboard') || 
-        window.location.pathname.includes('profile') || 
-        window.location.pathname.includes('settings') ||
-        window.location.pathname.includes('security')) {
-        
-        // Get auth token from sessionStorage
-        const authToken = sessionStorage.getItem('auth_token');
-        
-        // Set up request headers with Authorization token if available
-        const headers = {
-            'Accept': 'application/json'
-        };
-        
-        if (authToken) {
-            headers['Authorization'] = `Bearer ${authToken}`;
+            if (window.location.pathname.includes('dashboard') || 
+                window.location.pathname.includes('profile') || 
+                window.location.pathname.includes('settings')) {
+                
+                fetch('https://auth.kdj.lk/api/v1/users/me', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // Redirect to login if not authenticated
+                        window.location.href = '/index.php';
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data) {
+                        // Update user name in the header
+                        const userDisplayName = document.getElementById('userDisplayName');
+                        if (userDisplayName) {
+                            userDisplayName.textContent = data.display_name || data.email;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Auth check error:', error);
+                    // Redirect to login on error
+                    window.location.href = '/index.php';
+                });
+            }
         }
-        
-        fetch('https://auth.kdj.lk/api/v1/users/me', {
-            method: 'GET',
-            credentials: 'include',
-            headers: headers
-        })
-        .then(response => {
-            if (!response.ok) {
-                console.error('Authentication failed:', response.status);
-                // Redirect to login if not authenticated
-                window.location.href = '/index.php';
-                return null;
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data) {
-                // Update user name in the header
-                const userDisplayName = document.getElementById('userDisplayName');
-                if (userDisplayName) {
-                    userDisplayName.textContent = data.display_name || data.email;
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Auth check error:', error);
-            // Redirect to login on error
-            window.location.href = '/index.php';
-        });
-    }
-}
 
         // Run auth check on protected pages
         document.addEventListener('DOMContentLoaded', function() {
