@@ -201,7 +201,7 @@ const auth = {
      * @param {string} method - The MFA method (totp or backup)
      * @returns {Promise} Authentication result
      */
-     async verifyMfaLogin(code, method = 'totp') {
+    async verifyMfaLogin(code, method = 'totp') {
         try {
             // Get the pending MFA token
             const pendingToken = localStorage.getItem('pending_mfa_token');
@@ -211,58 +211,55 @@ const auth = {
                 throw new Error('No pending MFA verification found');
             }
             
-            // Set auth token temporarily so the API call can be authenticated
-            const tempAuthHeader = {
-                'Authorization': `Bearer ${pendingToken}`
-            };
+            // Prepare normalized code (remove formatting from backup codes)
+            const normalizedCode = method === 'backup' 
+                ? code.replace(/[-\s]/g, '') 
+                : code;
             
-            // Call API to verify MFA with the token in the header
-            // We need to use the raw fetch API here to ensure the token is included
-            const response = await fetch(`${API_BASE_URL}/auth/mfa/verify`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...tempAuthHeader
-                },
-                body: JSON.stringify({
-                    code: code,
-                    method: method
-                }),
-                credentials: 'include' // Include cookies
-            });
-            
-            // Handle error responses
-            if (!response.ok) {
-                const errorData = await response.json();
+            try {
+                // Temporarily set the token for the API call
+                const storage = window.localStorage || window.sessionStorage;
+                storage.setItem(this.TOKEN_KEY, pendingToken);
                 
-                // Provide specific error messages for backup codes
-                if (method === 'backup' && errorData.detail?.includes('Invalid')) {
-                    throw new Error('Invalid backup code. Please try again or use a different backup code.');
+                // Call MFA verify endpoint through our API client, which will use the token
+                const result = await api.fetchWithAuth('/auth/mfa/verify', 'POST', {
+                    code: normalizedCode,
+                    method: method
+                }, true);
+                
+                // If successful, set up the full session
+                const authData = {
+                    access_token: pendingToken,
+                    token_type: 'bearer',
+                    expires_in: 1800, // 30 minutes
+                    user_id: userId,
+                    mfa_required: false
+                };
+                
+                // Set the session
+                this.setSession(authData);
+                
+                // Clean up pending MFA data
+                localStorage.removeItem('pending_mfa_token');
+                localStorage.removeItem('pending_mfa_user_id');
+                
+                return result;
+            } catch (error) {
+                console.error('MFA API verification error:', error);
+                
+                // Specific error messages based on the error
+                if (error.message.includes('Invalid') || error.message.includes('verification')) {
+                    if (method === 'backup') {
+                        throw new Error('Invalid backup code. Please try again or use a different backup code.');
+                    } else {
+                        throw new Error('Invalid verification code. Please check your authenticator app and try again.');
+                    }
+                } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                    throw new Error('Authentication error. Please try again or return to login.');
                 }
                 
-                throw new Error(errorData.detail || 'MFA verification failed');
+                throw error;
             }
-            
-            // Parse successful response
-            const result = await response.json();
-            
-            // Create complete auth data object
-            const authData = {
-                access_token: pendingToken,
-                token_type: 'bearer',
-                expires_in: 1800, // 30 minutes
-                user_id: userId,
-                mfa_required: false
-            };
-            
-            // Set the session
-            this.setSession(authData);
-            
-            // Clean up pending MFA data
-            localStorage.removeItem('pending_mfa_token');
-            localStorage.removeItem('pending_mfa_user_id');
-            
-            return result;
         } catch (error) {
             console.error('MFA verification error:', error);
             throw error;

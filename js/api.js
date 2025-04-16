@@ -7,7 +7,7 @@
 const API_BASE_URL = 'https://auth.kdj.lk/api/v1';
 
 const api = {
-    /**
+   /**
      * Perform a fetch request with common settings
      * @param {string} endpoint - API endpoint
      * @param {string} method - HTTP method
@@ -15,52 +15,73 @@ const api = {
      * @param {boolean} includeAuth - Whether to include auth token
      * @returns {Promise} - Fetch promise
      */
-    async fetchWithAuth(endpoint, method = 'GET', data = null, includeAuth = true) {
-        const url = `${API_BASE_URL}${endpoint}`;
-        const options = {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            credentials: 'include' // Include cookies
-        };
+   async fetchWithAuth(endpoint, method = 'GET', data = null, includeAuth = true) {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        credentials: 'include' // Include cookies
+    };
+    
+    // Add auth token if needed
+    if (includeAuth) {
+        const token = auth.getToken();
+        if (token) {
+            options.headers['Authorization'] = `Bearer ${token}`;
+            console.log(`Adding Authorization header for ${endpoint}`);
+        } else if (endpoint === '/auth/mfa/verify') {
+            // Special case for MFA verification - try to get token from localStorage
+            const pendingToken = localStorage.getItem('pending_mfa_token');
+            if (pendingToken) {
+                options.headers['Authorization'] = `Bearer ${pendingToken}`;
+                console.log('Using pending MFA token for authorization');
+            }
+        }
+    }
+    
+    // Add request body for non-GET requests
+    if (data && method !== 'GET') {
+        options.body = JSON.stringify(data);
+    }
+    
+    try {
+        console.log(`Sending ${method} request to ${url}`);
+        const response = await fetch(url, options);
+        console.log(`Response status: ${response.status}`);
         
-        // Add auth token if needed
-        if (includeAuth) {
-            const token = auth.getToken();
-            if (token) {
-                options.headers['Authorization'] = `Bearer ${token}`;
+        // For MFA verification, handle 401 specially
+        if (response.status === 401 && endpoint === '/auth/mfa/verify') {
+            throw new Error('Authentication failed for MFA verification. Please return to login and try again.');
+        }
+        
+        // Check for 401 Unauthorized
+        if (response.status === 401) {
+            // If refresh token available, try to refresh the token
+            if (auth.getRefreshToken() && endpoint !== '/auth/refresh-token') {
+                try {
+                    await auth.refreshToken();
+                    // Retry the original request with new token
+                    return this.fetchWithAuth(endpoint, method, data, includeAuth);
+                } catch (refreshError) {
+                    // If refresh fails, logout user
+                    auth.logout();
+                    throw new Error('Session expired. Please log in again.');
+                }
+            } else {
+                // No refresh token or refresh endpoint called, logout user
+                auth.logout();
+                throw new Error('Authentication required. Please log in.');
             }
         }
         
-        // Add request body for non-GET requests
-        if (data && method !== 'GET') {
-            options.body = JSON.stringify(data);
+        // For responses with status 204 No Content, return empty object
+        if (response.status === 204) {
+            return {};
         }
         
         try {
-            const response = await fetch(url, options);
-            
-            // Check for 401 Unauthorized
-            if (response.status === 401) {
-                // If refresh token available, try to refresh the token
-                if (auth.getRefreshToken() && endpoint !== '/auth/refresh-token') {
-                    try {
-                        await auth.refreshToken();
-                        // Retry the original request with new token
-                        return this.fetchWithAuth(endpoint, method, data, includeAuth);
-                    } catch (refreshError) {
-                        // If refresh fails, logout user
-                        auth.logout();
-                        throw new Error('Session expired. Please log in again.');
-                    }
-                } else {
-                    // No refresh token or refresh endpoint called, logout user
-                    auth.logout();
-                    throw new Error('Authentication required. Please log in.');
-                }
-            }
-            
             // Parse response JSON
             const result = await response.json();
             
@@ -71,14 +92,21 @@ const api = {
             }
             
             return result;
-        } catch (error) {
-            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                // Network error
-                throw new Error('Network error. Please check your connection.');
+        } catch (jsonError) {
+            // Handle case where response is not JSON
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`);
             }
-            throw error;
+            return {}; // Return empty object for successful non-JSON responses
         }
-    },
+    } catch (error) {
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            // Network error
+            throw new Error('Network error. Please check your connection.');
+        }
+        throw error;
+    }
+},
     
     /**
      * Register a new user

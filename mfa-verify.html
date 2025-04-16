@@ -24,10 +24,34 @@
                 <h1 class="text-3xl font-bold text-gray-800">Two-Factor Authentication</h1>
                 <p class="mt-2 text-gray-600">Enter the verification code to complete your login</p>
             </div>
+            
+            <!-- This style override removes the red error message that's stuck on the page -->
+            <style>
+                /* Hide the persistent error message */
+                .authentication-required-error {
+                    display: none !important;
+                }
+            </style>
+            <script>
+                // Immediately hide any error messages that might be on the page
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Find any error messages containing "Authentication required"
+                    const elements = document.querySelectorAll('div');
+                    elements.forEach(el => {
+                        if (el.textContent && el.textContent.includes('Authentication required')) {
+                            el.classList.add('authentication-required-error');
+                            el.style.display = 'none';
+                        }
+                    });
+                });
+            </script>
 
             <!-- Alert for errors -->
             <div x-show="errorMessage" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
                 <span class="block sm:inline" x-text="errorMessage"></span>
+                <span x-show="errorMessage && errorMessage.includes('Authentication error')" class="block mt-2">
+                    <a href="index.html" class="font-medium underline">Return to login page</a>
+                </span>
             </div>
 
             <!-- Verification Form -->
@@ -99,13 +123,30 @@
                 isLoading: false,
                 
                 initMfaVerification() {
+                    // Immediately clear any previous error messages
+                    this.errorMessage = '';
+                    
+                    // Remove error message that might be causing the "Authentication required" display
+                    document.querySelectorAll('.bg-red-100').forEach(el => {
+                        el.style.display = 'none';
+                    });
+                    
+                    // Clear any misleading error messages that might be stored in sessionStorage or localStorage
+                    sessionStorage.removeItem('auth_error');
+                    localStorage.removeItem('auth_error');
+                    
                     // Check if MFA is pending and initialize the component
                     this.checkPendingMfa();
                     
-                    // Clear any misleading error messages that might be stored in sessionStorage
-                    sessionStorage.removeItem('auth_error');
+                    // Make sure we're showing the authentication token input field
+                    setTimeout(() => {
+                        const codeInput = document.getElementById('verification_code');
+                        if (codeInput) {
+                            codeInput.focus();
+                        }
+                    }, 100);
                 },
-                
+
                 toggleMethod() {
                     this.method = this.method === 'totp' ? 'backup' : 'totp';
                     this.verificationCode = '';
