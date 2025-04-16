@@ -1,203 +1,345 @@
-<!DOCTYPE html>
-<html lang="si">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Password - kdj.lk</title>
-    <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f4f4f4; }
-        .form-container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); width: 350px; }
-        .form-container h2 { text-align: center; margin-bottom: 20px; color: #333; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; color: #555; }
-        .form-group input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .form-group button { width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        .form-group button:hover { background-color: #0056b3; }
-        .form-group button:disabled { background-color: #6c757d; cursor: not-allowed; }
-        #message { margin-top: 15px; padding: 10px; border-radius: 4px; text-align: center; font-size: 14px; display: none; }
-        .message-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .message-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .login-link { text-align: center; margin-top: 15px; font-size: 14px; }
-        .login-link a { color: #007bff; text-decoration: none; }
-        .login-link a:hover { text-decoration: underline; }
-        .password-requirements { font-size: 12px; color: #6c757d; margin-top: 5px; }
-    </style>
-</head>
-<body>
-    <div class="form-container">
-        <h2>නව මුරපදයක් සකසන්න</h2>
-        <form id="resetPasswordForm">
-            <input type="hidden" id="reset_token" name="reset_token">
-            <div class="form-group">
-                <label for="new_password">නව මුරපදය:</label>
-                <input type="password" id="new_password" name="new_password" required>
-                <div class="password-requirements">
-                    මුරපදය අඩුම තරමින් අක්ෂර 12ක් විය යුතුය, ලොකු අකුරු, කුඩා අකුරු, ඉලක්කම් සහ විශේෂ අක්ෂර අඩංගු විය යුතුය.
+<?php
+// Set page specific variables
+$title = "Reset Password";
+$description = "Reset your KDJ Lanka account password";
+$lang = "si";
+
+// Add page specific scripts/styles
+$additional_head = <<<HTML
+<style>
+    .auth-container {
+        background-image: url('/assets/images/sl-pattern.png');
+        background-size: cover;
+        background-position: center;
+    }
+    .reset-card {
+        backdrop-filter: blur(10px);
+        background-color: rgba(255, 255, 255, 0.9);
+    }
+    .password-strength-meter {
+        height: 5px;
+        transition: all 0.3s ease;
+    }
+</style>
+HTML;
+
+// Include header
+include 'header.php';
+?>
+
+<div class="auth-container flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="reset-card max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-lg">
+        <div class="text-center">
+            <h2 class="mt-6 text-3xl font-extrabold text-kdj-dark">
+                නව මුරපදයක් සකසන්න
+            </h2>
+            <p class="mt-2 text-sm text-gray-600">
+                ඔබගේ KDJ Lanka ගිණුම සඳහා නව මුරපදයක් ඇතුලත් කරන්න
+            </p>
+        </div>
+        
+        <!-- Token Error Message -->
+        <div id="tokenErrorMessage" class="bg-red-50 p-4 rounded-md border border-red-200 hidden">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-circle text-red-400 text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">වලංගු නොවන Token එකක්</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <p id="tokenErrorDetail">Reset token එකක් හමුවුනේ නැත. කරුණාකර email එකේ ඇති link එක හරහා පිවිසෙන්න.</p>
+                    </div>
+                    <div class="mt-4">
+                        <a href="forgot_password.php" class="text-sm font-medium text-red-800 hover:text-red-900">
+                            නැවත නව reset link එකක් ඉල්ලන්න <span aria-hidden="true">&rarr;</span>
+                        </a>
+                    </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="confirm_password">නව මුරපදය තහවුරු කරන්න:</label>
-                <input type="password" id="confirm_password" name="confirm_password" required>
+        </div>
+        
+        <!-- Success Message -->
+        <div id="successMessage" class="bg-green-50 p-4 rounded-md border border-green-200 hidden">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-green-800">මුරපදය සාර්ථකව වෙනස් කරන ලදී!</h3>
+                    <div class="mt-2 text-sm text-green-700">
+                        <p>ඔබේ මුරපදය සාර්ථකව යාවත්කාලීන කර ඇත. ඔබට දැන් ඔබේ නව මුරපදය භාවිතයෙන් පුරනය විය හැක.</p>
+                    </div>
+                    <div class="mt-4">
+                        <a href="index.php" class="text-sm font-medium text-green-800 hover:text-green-900">
+                            පිවිසුම් පිටුවට යන්න <span aria-hidden="true">&rarr;</span>
+                        </a>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <button type="submit" id="submitButton">මුරපදය Reset කරන්න</button>
+        </div>
+        
+        <form id="resetPasswordForm" class="mt-8 space-y-6">
+            <input type="hidden" id="reset_token" name="reset_token">
+            
+            <div class="rounded-md shadow-sm space-y-4">
+                <div>
+                    <label for="new_password" class="block text-sm font-medium text-gray-700">නව මුරපදය</label>
+                    <div class="relative mt-1">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-gray-400"></i>
+                        </div>
+                        <input id="new_password" name="new_password" type="password" required 
+                            class="appearance-none relative block w-full px-3 py-3 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-kdj-red focus:border-kdj-red focus:z-10 sm:text-sm" 
+                            placeholder="නව මුරපදයක් ඇතුලත් කරන්න">
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                            <button type="button" id="togglePassword" class="text-gray-400 focus:outline-none hover:text-gray-500">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <div class="flex w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="password-strength-meter bg-red-500" id="passwordStrengthMeter" style="width: 0%"></div>
+                        </div>
+                        <ul class="mt-2 text-xs text-gray-600 space-y-1" id="passwordRequirements">
+                            <li id="req-length"><i class="fas fa-times-circle text-red-500 mr-1"></i> අඩුම තරමින් අක්ෂර 12ක් විය යුතුය</li>
+                            <li id="req-uppercase"><i class="fas fa-times-circle text-red-500 mr-1"></i> අඩුම තරමින් එක් ලොකු අකුරක් තිබිය යුතුය</li>
+                            <li id="req-lowercase"><i class="fas fa-times-circle text-red-500 mr-1"></i> අඩුම තරමින් එක් කුඩා අකුරක් තිබිය යුතුය</li>
+                            <li id="req-number"><i class="fas fa-times-circle text-red-500 mr-1"></i> අඩුම තරමින් එක් ඉලක්කමක් තිබිය යුතුය</li>
+                            <li id="req-special"><i class="fas fa-times-circle text-red-500 mr-1"></i> අඩුම තරමින් එක් විශේෂ අක්ෂරයක් තිබිය යුතුය</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="confirm_password" class="block text-sm font-medium text-gray-700">නව මුරපදය තහවුරු කරන්න</label>
+                    <div class="relative mt-1">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-gray-400"></i>
+                        </div>
+                        <input id="confirm_password" name="confirm_password" type="password" required 
+                            class="appearance-none relative block w-full px-3 py-3 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-kdj-red focus:border-kdj-red focus:z-10 sm:text-sm" 
+                            placeholder="නව මුරපදය නැවත ඇතුලත් කරන්න">
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <button type="submit" id="submitButton" 
+                    class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-kdj-red hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red">
+                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                        <i class="fas fa-key"></i>
+                    </span>
+                    මුරපදය යාවත්කාලීන කරන්න
+                </button>
             </div>
         </form>
-        <div id="message"></div>
-        <div class="login-link" id="loginLink" style="display: none;">
-            <a href="index.php">Login පිටුවට යන්න</a>
-        </div>
     </div>
+</div>
 
-    <script>
-        // --- Configuration ---
-        const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
-        // --------------------
-
-        const resetPasswordForm = document.getElementById('resetPasswordForm');
-        const messageDiv = document.getElementById('message');
-        const tokenInput = document.getElementById('reset_token');
-        const loginLink = document.getElementById('loginLink');
-        const submitButton = document.getElementById('submitButton');
-
-        // Simple password strength validation to match backend requirements
-        function validatePassword(password) {
-            const minLength = 12;
-            const hasUppercase = /[A-Z]/.test(password);
-            const hasLowercase = /[a-z]/.test(password);
-            const hasDigits = /\d/.test(password);
-            const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-            
-            const errors = [];
-            
-            if (password.length < minLength) {
-                errors.push(`මුරපදය අඩුම තරමින් අක්ෂර ${minLength}ක් විය යුතුය`);
-            }
-            
-            if (!hasUppercase) {
-                errors.push("අඩුම තරමින් එක් ලොකු අකුරක් තිබිය යුතුය");
-            }
-            
-            if (!hasLowercase) {
-                errors.push("අඩුම තරමින් එක් කුඩා අකුරක් තිබිය යුතුය");
-            }
-            
-            if (!hasDigits) {
-                errors.push("අඩුම තරමින් එක් ඉලක්කමක් තිබිය යුතුය");
-            }
-            
-            if (!hasSpecialChars) {
-                errors.push("අඩුම තරමින් එක් විශේෂ අක්ෂරයක් තිබිය යුතුය");
-            }
-            
-            return {
-                valid: errors.length === 0,
-                errors: errors
-            };
-        }
-
-        function showMessage(text, isError = false) {
-            messageDiv.textContent = text;
-            messageDiv.className = isError ? 'message-error' : 'message-success';
-            messageDiv.style.display = 'block';
-        }
-
-        // Get token from URL query parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
-
-        if (token) {
-            tokenInput.value = token;
+<?php
+// Page specific scripts
+$additional_scripts = <<<HTML
+<script>
+    // Configuration
+    const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
+    
+    // Get the token from the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const resetTokenInput = document.getElementById('reset_token');
+    const tokenErrorMessage = document.getElementById('tokenErrorMessage');
+    const tokenErrorDetail = document.getElementById('tokenErrorDetail');
+    const resetPasswordForm = document.getElementById('resetPasswordForm');
+    const successMessage = document.getElementById('successMessage');
+    
+    // Check if token exists
+    if (!token) {
+        resetPasswordForm.classList.add('hidden');
+        tokenErrorMessage.classList.remove('hidden');
+        tokenErrorDetail.textContent = 'Reset token එකක් හමුවුනේ නැත. කරුණාකර නැවත reset link එකක් ඉල්ලන්න.';
+    } else {
+        // Verify token format is correct (basic check)
+        if (token.length < 20) {
+            resetPasswordForm.classList.add('hidden');
+            tokenErrorMessage.classList.remove('hidden');
+            tokenErrorDetail.textContent = 'වලංගු නොවන reset token එකක්. කරුණාකර නැවත reset link එකක් ඉල්ලන්න.';
         } else {
-            showMessage('Reset token එකක් හමුවුනේ නැත. කරුණාකර email එකේ ඇති link එක හරහා පිවිසෙන්න.', true);
-            resetPasswordForm.style.display = 'none'; // Hide form if no token
+            // Set token to hidden input
+            resetTokenInput.value = token;
         }
-
-        resetPasswordForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-
-            const resetToken = tokenInput.value;
-            const newPassword = document.getElementById('new_password').value;
-            const confirmPassword = document.getElementById('confirm_password').value;
-
-            messageDiv.style.display = 'none';
-            messageDiv.textContent = '';
-            messageDiv.className = '';
-            loginLink.style.display = 'none';
-
-            if (!resetToken) {
-                showMessage('Reset token එකක් හමුවුනේ නැත.', true);
-                return;
-            }
-
-            if (newPassword !== confirmPassword) {
-                showMessage('නව මුරපද දෙක සමාන නොවේ!', true);
-                return;
-            }
+    }
+    
+    // Toggle password visibility
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('new_password');
+    
+    togglePassword.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('fa-eye');
+        this.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+    
+    // Password strength verification
+    const passwordStrengthMeter = document.getElementById('passwordStrengthMeter');
+    const passwordRequirements = {
+        length: document.getElementById('req-length'),
+        uppercase: document.getElementById('req-uppercase'),
+        lowercase: document.getElementById('req-lowercase'),
+        number: document.getElementById('req-number'),
+        special: document.getElementById('req-special')
+    };
+    
+    passwordInput.addEventListener('input', function() {
+        const password = this.value;
+        let score = 0;
+        const maxScore = 5;
+        
+        // Check length
+        const hasLength = password.length >= 12;
+        updateRequirement('length', hasLength);
+        if (hasLength) score++;
+        
+        // Check uppercase
+        const hasUppercase = /[A-Z]/.test(password);
+        updateRequirement('uppercase', hasUppercase);
+        if (hasUppercase) score++;
+        
+        // Check lowercase
+        const hasLowercase = /[a-z]/.test(password);
+        updateRequirement('lowercase', hasLowercase);
+        if (hasLowercase) score++;
+        
+        // Check number
+        const hasNumber = /\d/.test(password);
+        updateRequirement('number', hasNumber);
+        if (hasNumber) score++;
+        
+        // Check special chars
+        const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+        updateRequirement('special', hasSpecial);
+        if (hasSpecial) score++;
+        
+        // Update strength meter
+        const percentage = (score / maxScore) * 100;
+        passwordStrengthMeter.style.width = `\${percentage}%`;
+        
+        // Update color based on strength
+        if (percentage < 40) {
+            passwordStrengthMeter.className = 'password-strength-meter bg-red-500';
+        } else if (percentage < 80) {
+            passwordStrengthMeter.className = 'password-strength-meter bg-yellow-500';
+        } else {
+            passwordStrengthMeter.className = 'password-strength-meter bg-green-500';
+        }
+    });
+    
+    function updateRequirement(req, isFulfilled) {
+        const element = passwordRequirements[req];
+        const icon = element.querySelector('i');
+        
+        if (isFulfilled) {
+            icon.className = 'fas fa-check-circle text-green-500 mr-1';
+        } else {
+            icon.className = 'fas fa-times-circle text-red-500 mr-1';
+        }
+    }
+    
+    // Form submission
+    const submitButton = document.getElementById('submitButton');
+    const confirmPassword = document.getElementById('confirm_password');
+    
+    resetPasswordForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        
+        const token = resetTokenInput.value;
+        const newPassword = passwordInput.value;
+        const passwordConfirm = confirmPassword.value;
+        
+        // Client-side validation
+        if (newPassword !== passwordConfirm) {
+            showToast('නව මුරපද දෙක සමාන නොවේ!', 'error');
+            return;
+        }
+        
+        // Check password strength
+        if (
+            newPassword.length < 12 ||
+            !/[A-Z]/.test(newPassword) ||
+            !/[a-z]/.test(newPassword) ||
+            !/\d/.test(newPassword) ||
+            !/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)
+        ) {
+            showToast('මුරපදය ප්‍රමාණවත් තරම් ශක්තිමත් නොවේ', 'error');
+            return;
+        }
+        
+        // Disable button and show loading
+        submitButton.disabled = true;
+        const originalButtonText = submitButton.innerHTML;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> සකසමින්...';
+        showLoading();
+        
+        try {
+            const response = await fetch(`\${apiBaseUrl}/auth/reset-password/confirm`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    token: token,
+                    new_password: newPassword
+                })
+            });
             
-            // Validate password strength
-            const passwordValidation = validatePassword(newPassword);
-            if (!passwordValidation.valid) {
-                showMessage('මුරපදය ප්‍රමාණවත් තරම් ශක්තිමත් නොවේ: ' + passwordValidation.errors.join(', '), true);
-                return;
-            }
+            const responseData = await response.json();
             
-            submitButton.disabled = true;
-            submitButton.textContent = 'සකසමින්...';
-
-            try {
-                // Make API call to reset password
-                const response = await fetch(`${apiBaseUrl}/auth/reset-password/confirm`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        token: resetToken,
-                        new_password: newPassword
-                    })
-                });
-
-                const responseData = await response.json();
-
-                if (response.ok) {
-                    showMessage(responseData.message || 'මුරපදය සාර්ථකව reset කරන ලදී.', false);
-                    loginLink.style.display = 'block';
-                    resetPasswordForm.reset();
-                    resetPasswordForm.style.display = 'none';
-                } else {
-                    let errorMessage = 'මුරපදය reset කිරීමට නොහැක. ';
-                    
-                    if (responseData.detail) {
-                        if (typeof responseData.detail === 'string') {
-                            if (responseData.detail.includes('Token expired')) {
-                                errorMessage = 'Reset link එක කල් ඉකුත් වී ඇත. කරුණාකර නැවත link එකක් ඉල්ලන්න.';
-                            } else if (responseData.detail.includes('Password must')) {
-                                errorMessage = responseData.detail.replace('Password must', 'මුරපදය අනිවාර්යයෙන්');
-                            } else {
-                                errorMessage += responseData.detail;
-                            }
-                        } else if (Array.isArray(responseData.detail)) {
-                            errorMessage += responseData.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join(', ');
+            if (response.ok) {
+                hideLoading();
+                resetPasswordForm.classList.add('hidden');
+                successMessage.classList.remove('hidden');
+                
+                // Automatically redirect to login page after 5 seconds
+                setTimeout(() => {
+                    window.location.href = 'index.php';
+                }, 5000);
+            } else {
+                hideLoading();
+                
+                let errorMessage = 'මුරපදය reset කිරීමට නොහැක. ';
+                
+                if (responseData.detail) {
+                    if (typeof responseData.detail === 'string') {
+                        if (responseData.detail.includes('Token expired')) {
+                            errorMessage = 'Reset link එක කල් ඉකුත් වී ඇත. කරුණාකර නැවත link එකක් ඉල්ලන්න.';
+                        } else if (responseData.detail.includes('Password must')) {
+                            errorMessage = responseData.detail.replace('Password must', 'මුරපදය අනිවාර්යයෙන්');
                         } else {
-                            errorMessage += JSON.stringify(responseData.detail);
+                            errorMessage += responseData.detail;
                         }
                     } else {
-                        errorMessage += `Error code: ${response.status}`;
+                        errorMessage += JSON.stringify(responseData.detail);
                     }
-                    
-                    showMessage(errorMessage, true);
-                    submitButton.disabled = false;
-                    submitButton.textContent = 'මුරපදය Reset කරන්න';
+                } else {
+                    errorMessage += `Error code: \${response.status}`;
                 }
-            } catch (error) {
-                console.error('Error during password reset request:', error);
-                showMessage('මුරපදය reset කිරීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', true);
+                
+                showToast(errorMessage, 'error');
                 submitButton.disabled = false;
-                submitButton.textContent = 'මුරපදය Reset කරන්න';
+                submitButton.innerHTML = originalButtonText;
             }
-        });
-    </script>
-</body>
-</html>
+        } catch (error) {
+            hideLoading();
+            showToast('මුරපදය reset කිරීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
+        }
+    });
+</script>
+HTML;
+
+// Include footer
+include 'footer.php';
+?>

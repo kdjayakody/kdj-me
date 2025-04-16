@@ -1,97 +1,166 @@
-<!DOCTYPE html>
-<html lang="si">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password - kdj.lk</title>
-    <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f4f4f4; }
-        .form-container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); width: 350px; }
-        .form-container h2 { text-align: center; margin-bottom: 20px; color: #333; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; color: #555; }
-        .form-group input[type="email"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .form-group button { width: 100%; padding: 10px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        .form-group button:hover { background-color: #e0a800; }
-        .form-group button:disabled { background-color: #f8d775; cursor: not-allowed; }
-        #message { margin-top: 15px; padding: 10px; border-radius: 4px; text-align: center; font-size: 14px; display: none; }
-        .message-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .message-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .login-link { text-align: center; margin-top: 15px; font-size: 14px; }
-        .login-link a { color: #007bff; text-decoration: none; }
-        .login-link a:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="form-container">
-        <h2>මුරපදය අමතකද?</h2>
-        <p style="text-align: center; font-size: 14px; color: #666;">ඔබගේ ඊමේල් ලිපිනය ඇතුලත් කරන්න. මුරපදය නැවත සකස් කිරීමේ සබැඳියක් අපි එවන්නෙමු.</p>
-        <form id="forgotPasswordForm">
-            <div class="form-group">
-                <label for="email">ඊමේල් ලිපිනය:</label>
-                <input type="email" id="email" name="email" required>
+<?php
+// Set page specific variables
+$title = "Forgot Password";
+$description = "Reset your KDJ Lanka account password";
+$lang = "si";
+
+// Add page specific scripts/styles
+$additional_head = <<<HTML
+<style>
+    .auth-container {
+        background-image: url('/assets/images/sl-pattern.png');
+        background-size: cover;
+        background-position: center;
+    }
+    .forgot-card {
+        backdrop-filter: blur(10px);
+        background-color: rgba(255, 255, 255, 0.9);
+    }
+</style>
+HTML;
+
+// Include header
+include 'header.php';
+?>
+
+<div class="auth-container flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="forgot-card max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-lg">
+        <div class="text-center">
+            <h2 class="mt-6 text-3xl font-extrabold text-kdj-dark">
+                මුරපදය අමතකද?
+            </h2>
+            <p class="mt-2 text-sm text-gray-600">
+                ඔබගේ ඊමේල් ලිපිනය ඇතුලත් කරන්න. මුරපදය නැවත සකස් කිරීමේ සබැඳියක් අපි එවන්නෙමු.
+            </p>
+        </div>
+        
+        <div id="successMessage" class="bg-green-50 p-4 rounded-md border border-green-200 mt-4 hidden">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-green-800">ඉල්ලීම සාර්ථකයි!</h3>
+                    <div class="mt-2 text-sm text-green-700">
+                        <p>ඔබගේ ඊමේල් ලිපිනය ලියාපදිංචි වී ඇත්නම්, ඔබට මුරපදය නැවත සකස් කිරීමේ සබැඳියක් ලැබෙනු ඇත.</p>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <button type="submit" id="submitButton">Reset Link එක එවන්න</button>
+        </div>
+        
+        <form id="forgotPasswordForm" class="mt-8 space-y-6">
+            <div class="rounded-md shadow-sm">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">ඊමේල් ලිපිනය</label>
+                    <div class="relative mt-1">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-envelope text-gray-400"></i>
+                        </div>
+                        <input id="email" name="email" type="email" autocomplete="email" required 
+                            class="appearance-none relative block w-full px-3 py-3 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-kdj-red focus:border-kdj-red focus:z-10 sm:text-sm" 
+                            placeholder="ඔබගේ ඊමේල් ලිපිනය ඇතුලත් කරන්න">
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <button type="submit" id="submitButton" 
+                    class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-kdj-red hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red">
+                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                        <i class="fas fa-paper-plane"></i>
+                    </span>
+                    Reset Link එක එවන්න
+                </button>
+            </div>
+            
+            <div class="flex items-center justify-center space-x-4">
+                <a href="index.php" class="text-sm font-medium text-kdj-red hover:text-red-800">
+                    <i class="fas fa-arrow-left mr-1"></i> Login පිටුවට යන්න
+                </a>
             </div>
         </form>
-        <div id="message"></div>
-        <div class="login-link">
-            <a href="index.php">Login පිටුවට යන්න</a>
-        </div>
     </div>
+</div>
 
-    <script>
-        // --- Configuration ---
-        const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
-        // --------------------
-
-        const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-        const messageDiv = document.getElementById('message');
-        const submitButton = document.getElementById('submitButton');
-
-        function showMessage(text, isError = false) {
-            messageDiv.textContent = text;
-            messageDiv.className = isError ? 'message-error' : 'message-success';
-            messageDiv.style.display = 'block';
+<?php
+// Page specific scripts
+$additional_scripts = <<<HTML
+<script>
+    // Configuration
+    const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
+    
+    // Form submission
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    const submitButton = document.getElementById('submitButton');
+    const successMessage = document.getElementById('successMessage');
+    
+    forgotPasswordForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        
+        // Client-side validation
+        if (!isValidEmail(email)) {
+            showToast('කරුණාකර වලංගු ඊමේල් ලිපිනයක් ඇතුලත් කරන්න', 'error');
+            return;
         }
-
-        forgotPasswordForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const email = document.getElementById('email').value;
-
-            messageDiv.style.display = 'none';
-            messageDiv.textContent = '';
-            messageDiv.className = '';
+        
+        // Disable button and show loading
+        submitButton.disabled = true;
+        const originalButtonText = submitButton.innerHTML;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> සකසමින්...';
+        showLoading();
+        
+        try {
+            const response = await fetch(`\${apiBaseUrl}/auth/reset-password/request`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ email: email })
+            });
             
-            submitButton.disabled = true;
-            submitButton.textContent = 'සකසමින්...';
+            const responseData = await response.json();
+            
+            // For security reasons, show success message regardless of whether email exists
+            hideLoading();
+            forgotPasswordForm.classList.add('hidden');
+            successMessage.classList.remove('hidden');
+            
+            // Automatically redirect to login page after 5 seconds
+            setTimeout(() => {
+                window.location.href = 'index.php';
+            }, 5000);
+            
+        } catch (error) {
+            // For security reasons, still show success message on error
+            hideLoading();
+            forgotPasswordForm.classList.add('hidden');
+            successMessage.classList.remove('hidden');
+            
+            // Log error for troubleshooting
+            console.error('Error during forgot password request:', error);
+            
+            // Automatically redirect to login page after 5 seconds
+            setTimeout(() => {
+                window.location.href = 'index.php';
+            }, 5000);
+        } finally {
+            // Re-enable button just in case
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
+        }
+    });
+    
+    // Email validation helper
+    function isValidEmail(email) {
+        const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+        return re.test(String(email).toLowerCase());
+    }
+</script>
+HTML;
 
-            try {
-                const response = await fetch(`${apiBaseUrl}/auth/reset-password/request`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ email: email })
-                });
-
-                const responseData = await response.json();
-
-                // Assume success regardless of whether email exists, as per backend logic
-                showMessage(responseData.message || 'ඔබගේ ඊමේල් ලිපිනය ලියාපදිංචි වී ඇත්නම්, ඔබට මුරපදය නැවත සකස් කිරීමේ සබැඳියක් ලැබෙනු ඇත.');
-                forgotPasswordForm.reset();
-
-            } catch (error) {
-                console.error('Error during forgot password request:', error);
-                // Still show the generic success message for security
-                showMessage('ඔබගේ ඊමේල් ලිපිනය ලියාපදිංචි වී ඇත්නම්, ඔබට මුරපදය නැවත සකස් කිරීමේ සබැඳියක් ලැබෙනු ඇත.');
-            } finally {
-                submitButton.disabled = false;
-                submitButton.textContent = 'Reset Link එක එවන්න';
-            }
-        });
-    </script>
-</body>
-</html>
+// Include footer
+include 'footer.php';
+?>

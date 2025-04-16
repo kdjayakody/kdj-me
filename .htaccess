@@ -1,0 +1,146 @@
+# Enable rewrite engine
+RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Set security headers
+<IfModule mod_headers.c>
+    # Protect against XSS attacks
+    Header set X-XSS-Protection "1; mode=block"
+    
+    # Prevent MIME-type sniffing
+    Header set X-Content-Type-Options "nosniff"
+    
+    # Prevent clickjacking
+    Header set X-Frame-Options "SAMEORIGIN"
+    
+    # Content Security Policy
+    Header set Content-Security-Policy "default-src 'self' *.kdj.lk; script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net cdnjs.cloudflare.com unpkg.com; style-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: *.kdj.lk; connect-src 'self' *.kdj.lk;"
+    
+    # HTTP Strict Transport Security (HSTS)
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    
+    # Referrer Policy
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Permissions Policy
+    Header set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    
+    # Remove PHP version from response headers
+    Header unset X-Powered-By
+</IfModule>
+
+# Custom error pages
+ErrorDocument 404 /404.php
+ErrorDocument 403 /404.php
+ErrorDocument 500 /500.php
+
+# Protect files from browsing
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Prevent directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "(^\.htaccess|\.env|\.git|\.htpasswd)">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# PHP settings
+<IfModule mod_php7.c>
+    # Disable register globals
+    php_flag register_globals off
+    
+    # Magic quotes
+    php_flag magic_quotes_gpc off
+    
+    # Secure PHP configuration
+    php_value max_execution_time 60
+    php_value max_input_time 60
+    php_value memory_limit 128M
+    php_value post_max_size 32M
+    php_value upload_max_filesize 32M
+    
+    # Session and cookie settings
+    php_value session.use_only_cookies 1
+    php_value session.cookie_httponly 1
+    php_value session.cookie_secure 1
+    php_value session.use_strict_mode 1
+    php_value session.cookie_samesite "Lax"
+</IfModule>
+
+# Cache control for static files
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Images
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    
+    # CSS, JavaScript
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    
+    # Fonts
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+    ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+    ExpiresByType font/ttf "access plus 1 year"
+    ExpiresByType font/otf "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# Compress text files
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json application/xml
+</IfModule>
+
+# Cross-domain access for fonts
+<IfModule mod_headers.c>
+    <FilesMatch "\.(ttf|ttc|otf|eot|woff|woff2|font.css)$">
+        Header set Access-Control-Allow-Origin "*.kdj.lk"
+    </FilesMatch>
+</IfModule>
+
+# Pretty URLs (remove .php extension)
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [L]
+
+# Redirect /login to index.php
+RewriteRule ^login$ index.php [L]
+
+# Redirect /register to register.php
+RewriteRule ^register$ register.php [L]
+
+# Redirect /forgot-password to forgot_password.php
+RewriteRule ^forgot-password$ forgot_password.php [L]
+
+# Redirect /reset-password to reset_password.php
+RewriteRule ^reset-password$ reset_password.php [L]
+
+# Redirect /verify-email to verify_email.php
+RewriteRule ^verify-email$ verify-email.php [L]
+
+# Redirect /dashboard to dashboard.php
+RewriteRule ^dashboard$ dashboard.php [L]
+
+# Redirect /profile to profile.php
+RewriteRule ^profile$ profile.php [L]
+
+# Redirect /settings to settings.php
+RewriteRule ^settings$ settings.php [L]
+
+# Redirect /security to security.php
+RewriteRule ^security$ security.php [L]

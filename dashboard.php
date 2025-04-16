@@ -1,393 +1,473 @@
-<!DOCTYPE html>
-<html lang="si">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - kdj.lk</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; background-color: #f8f9fa; }
-        .container { max-width: 800px; margin: auto; background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
-        h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .profile-info p { margin: 5px 0; color: #555; }
-        .profile-info strong { color: #333; min-width: 120px; display: inline-block;}
-        .section { margin-top: 30px; }
-        button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px; }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-primary { background-color: #007bff; color: white; }
-        .btn-primary:hover { background-color: #0056b3; }
-        .btn-secondary { background-color: #6c757d; color: white; }
-        .btn-secondary:hover { background-color: #5a6268; }
-        .btn-danger { background-color: #dc3545; color: white; }
-        .btn-danger:hover { background-color: #c82333; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; color: #555; }
-        .form-group input[type="text"],
-        .form-group input[type="tel"],
-        .form-group input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; max-width: 400px;}
-        .message { margin-top: 15px; padding: 10px; border-radius: 4px; text-align: center; font-size: 14px; display: none; }
-        .message-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .message-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .password-requirements { font-size: 12px; color: #6c757d; margin-top: 5px; max-width: 400px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>Dashboard</h2>
-            <button id="logoutButton" class="btn-secondary">Logout</button>
+<?php
+// Set page specific variables
+$title = "Dashboard";
+$description = "KDJ Lanka User Dashboard";
+$lang = "si";
+
+// Add page specific scripts/styles
+$additional_head = <<<HTML
+<style>
+    /* Sidebar styles */
+    @media (min-width: 768px) {
+        .sidebar {
+            width: 250px;
+        }
+        .content {
+            margin-left: 250px;
+        }
+    }
+    
+    /* Dashboard card styles */
+    .dashboard-card {
+        transition: all 0.3s ease;
+    }
+    .dashboard-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Active sidebar link */
+    .sidebar-link.active {
+        background-color: rgba(203, 33, 39, 0.1);
+        color: #cb2127;
+        border-left: 3px solid #cb2127;
+    }
+</style>
+HTML;
+
+// Include header
+include 'header.php';
+?>
+
+<div class="flex min-h-screen bg-gray-100">
+    <!-- Sidebar -->
+    <aside class="sidebar bg-white shadow-md fixed h-full left-0 top-16 hidden md:block overflow-y-auto">
+        <div class="py-4 px-3">
+            <div class="mb-6 px-4">
+                <div class="p-2 bg-kdj-red bg-opacity-10 rounded-lg">
+                    <h2 class="text-lg font-semibold text-kdj-dark">
+                        <span id="sidebarGreeting">සුභ දවසක්</span>
+                    </h2>
+                    <p class="text-sm text-gray-600" id="sidebarUserName">පරිශීලක</p>
+                </div>
+            </div>
+            
+            <ul class="space-y-2 mt-4">
+                <li>
+                    <a href="dashboard.php" class="sidebar-link active flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-tachometer-alt w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="profile.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-user w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>Profile</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="settings.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-cog w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="security.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-shield-alt w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>Security</span>
+                    </a>
+                </li>
+                
+                <li class="border-t border-gray-200 my-4 pt-4">
+                    <h3 class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Applications
+                    </h3>
+                </li>
+                
+                <li>
+                    <a href="https://singlish.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-language w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>KDJ Singlish</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://events.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-calendar-alt w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>KDJ Events</span>
+                    </a>
+                </li>
+                
+                <li class="border-t border-gray-200 my-4 pt-2">
+                    <button id="sidebarLogoutBtn" class="w-full flex items-center px-4 py-3 text-kdj-red hover:bg-red-50 rounded-md">
+                        <i class="fas fa-sign-out-alt w-5 h-5 mr-3"></i>
+                        <span>Logout</span>
+                    </button>
+                </li>
+            </ul>
         </div>
+    </aside>
 
-        <div id="loadingMessage">Loading user data...</div>
-        <div id="profileSection" style="display: none;">
-
-            <div class="section profile-info">
-                <h3>User Profile</h3>
-                <p><strong>UID:</strong> <span id="profileUid"></span></p>
-                <p><strong>Email:</strong> <span id="profileEmail"></span></p>
-                <p><strong>Display Name:</strong> <span id="profileDisplayName"></span></p>
-                <p><strong>Phone Number:</strong> <span id="profilePhoneNumber"></span></p>
-                <p><strong>Email Verified:</strong> <span id="profileEmailVerified"></span></p>
-                <p><strong>MFA Enabled:</strong> <span id="profileMfaEnabled"></span></p>
-                <p><strong>Roles:</strong> <span id="profileRoles"></span></p>
-            </div>
-
-            <div class="section">
-                <h3>Update Profile</h3>
-                <form id="updateProfileForm">
-                    <div class="form-group">
-                        <label for="updateDisplayName">Display Name:</label>
-                        <input type="text" id="updateDisplayName" name="display_name">
-                    </div>
-                    <div class="form-group">
-                        <label for="updatePhoneNumber">Phone Number (E.164):</label>
-                        <input type="tel" id="updatePhoneNumber" name="phone_number" placeholder="+947XXXXXXXX">
-                    </div>
-                    <button type="submit" id="updateProfileButton" class="btn-primary">Save Profile</button>
-                </form>
-                <div id="profileUpdateMessage" class="message"></div>
-            </div>
-
-            <div class="section">
-                <h3>Change Password</h3>
-                <form id="updatePasswordForm">
-                    <div class="form-group">
-                        <label for="currentPassword">Current Password:</label>
-                        <input type="password" id="currentPassword" name="current_password" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="newPassword">New Password:</label>
-                        <input type="password" id="newPassword" name="new_password" required>
-                        <div class="password-requirements">
-                            මුරපදය අඩුම තරමින් අක්ෂර 12ක් විය යුතුය, ලොකු අකුරු, කුඩා අකුරු, ඉලක්කම් සහ විශේෂ අක්ෂර අඩංගු විය යුතුය.
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirmNewPassword">Confirm New Password:</label>
-                        <input type="password" id="confirmNewPassword" required>
-                    </div>
-                    <button type="submit" id="updatePasswordButton" class="btn-primary">Update Password</button>
-                </form>
-                <div id="passwordUpdateMessage" class="message"></div>
-            </div>
-
-            <div class="section">
-                <h3>Delete Account</h3>
-                <p style="color: red;">Warning: This action cannot be undone.</p>
-                <button id="deleteAccountButton" class="btn-danger">Delete My Account</button>
-                <div id="deleteAccountMessage" class="message"></div>
-            </div>
-
-        </div>
-        <div id="errorMessage" class="message message-error" style="display: none;"></div>
+    <!-- Mobile sidebar toggle -->
+    <div class="md:hidden fixed bottom-4 right-4 z-10">
+        <button id="mobileSidebarToggle" class="bg-kdj-red text-white rounded-full p-3 shadow-lg">
+            <i class="fas fa-bars"></i>
+        </button>
     </div>
 
-    <script>
-        // --- Configuration ---
-        const apiBaseUrl = 'https://auth.kdj.lk/api/v1'; 
-        const loginPageUrl = 'index.php'; 
-        // --------------------
-
-        const loadingMessage = document.getElementById('loadingMessage');
-        const profileSection = document.getElementById('profileSection');
-        const errorMessage = document.getElementById('errorMessage');
-        const logoutButton = document.getElementById('logoutButton');
-        const updateProfileForm = document.getElementById('updateProfileForm');
-        const updateProfileButton = document.getElementById('updateProfileButton');
-        const profileUpdateMessage = document.getElementById('profileUpdateMessage');
-        const updatePasswordForm = document.getElementById('updatePasswordForm');
-        const updatePasswordButton = document.getElementById('updatePasswordButton');
-        const passwordUpdateMessage = document.getElementById('passwordUpdateMessage');
-        const deleteAccountButton = document.getElementById('deleteAccountButton');
-        const deleteAccountMessage = document.getElementById('deleteAccountMessage');
-
-        // --- Helper function for API calls ---
-        async function fetchApi(endpoint, options = {}) {
-            const defaultHeaders = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            };
-
-            const config = {
-                ...options,
-                headers: {
-                    ...defaultHeaders,
-                    ...(options.headers || {}),
-                },
-                credentials: 'include' // Crucial for sending/receiving cookies
-            };
-
-            try {
-                const response = await fetch(`${apiBaseUrl}${endpoint}`, config);
-                if (response.status === 401) {
-                    // Save current URL to redirect back after login
-                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
-                    window.location.href = loginPageUrl;
-                    throw new Error('Unauthorized');
-                }
-                return response;
-            } catch (error) {
-                console.error(`API call to ${endpoint} failed:`, error);
-                errorMessage.textContent = `Request failed: ${error.message}. Please check connection or login again.`;
-                errorMessage.style.display = 'block';
-                loadingMessage.style.display = 'none';
-                profileSection.style.display = 'none';
-                throw error;
-            }
-        }
-
-        // --- Display Message Utility ---
-        function showMessage(element, text, isSuccess = true) {
-            element.textContent = text;
-            element.className = isSuccess ? 'message message-success' : 'message message-error';
-            element.style.display = 'block';
-            // Hide message after 5 seconds
-            setTimeout(() => { element.style.display = 'none'; }, 5000);
-        }
-
-        // Simple password strength validation to match backend requirements
-        function validatePassword(password) {
-            const minLength = 12;
-            const hasUppercase = /[A-Z]/.test(password);
-            const hasLowercase = /[a-z]/.test(password);
-            const hasDigits = /\d/.test(password);
-            const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    <!-- Mobile sidebar -->
+    <div id="mobileSidebar" class="md:hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-20 hidden">
+        <div class="bg-white w-64 h-full overflow-y-auto transform transition-transform -translate-x-full" id="mobileSidebarContent">
+            <div class="flex justify-between items-center p-4 border-b">
+                <div class="flex items-center">
+                    <span class="font-bold text-xl text-kdj-dark">KDJ</span>
+                    <span class="font-bold text-xl text-kdj-red">Lanka</span>
+                </div>
+                <button id="closeMobileSidebar" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
             
-            const errors = [];
-            
-            if (password.length < minLength) {
-                errors.push(`Password must be at least ${minLength} characters long`);
-            }
-            
-            if (!hasUppercase) {
-                errors.push("Password must contain at least one uppercase letter");
-            }
-            
-            if (!hasLowercase) {
-                errors.push("Password must contain at least one lowercase letter");
-            }
-            
-            if (!hasDigits) {
-                errors.push("Password must contain at least one digit");
-            }
-            
-            if (!hasSpecialChars) {
-                errors.push("Password must contain at least one special character");
-            }
-            
-            return {
-                valid: errors.length === 0,
-                errors: errors
-            };
-        }
-
-        // --- Load User Data ---
-        async function loadUserProfile() {
-            try {
-                const response = await fetchApi('/users/me');
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch profile: ${response.status}`);
-                }
-                const user = await response.json();
-
-                document.getElementById('profileUid').textContent = user.uid;
-                document.getElementById('profileEmail').textContent = user.email;
-                document.getElementById('profileDisplayName').textContent = user.display_name || '-';
-                document.getElementById('profilePhoneNumber').textContent = user.phone_number || '-';
-                document.getElementById('profileEmailVerified').textContent = user.email_verified ? 'Yes' : 'No';
-                document.getElementById('profileMfaEnabled').textContent = user.mfa_enabled ? 'Yes' : 'No';
-                document.getElementById('profileRoles').textContent = user.roles.join(', ') || 'None';
-
-                // Pre-fill update form
-                document.getElementById('updateDisplayName').value = user.display_name || '';
-                document.getElementById('updatePhoneNumber').value = user.phone_number || '';
-
-                loadingMessage.style.display = 'none';
-                errorMessage.style.display = 'none';
-                profileSection.style.display = 'block';
-
-            } catch (error) {
-                console.error("Could not load user profile.", error);
-                loadingMessage.style.display = 'none';
-                profileSection.style.display = 'none';
-                if (error.message !== 'Unauthorized') {
-                    errorMessage.textContent = 'Failed to load user profile. You might need to log in again.';
-                    errorMessage.style.display = 'block';
-                }
-            }
-        }
-
-        // --- Logout ---
-        logoutButton.addEventListener('click', async () => {
-            if (!confirm('Are you sure you want to logout?')) return;
-            
-            logoutButton.disabled = true;
-            logoutButton.textContent = 'Logging out...';
-            
-            try {
-                const response = await fetchApi('/auth/logout', { method: 'POST' });
-                if (response.ok) {
-                    window.location.href = loginPageUrl;
-                } else {
-                    const errorData = await response.json().catch(() => ({ detail: 'Logout failed.' }));
-                    showMessage(errorMessage, `Logout failed: ${errorData.detail || response.statusText}`, false);
-                    logoutButton.disabled = false;
-                    logoutButton.textContent = 'Logout';
-                }
-            } catch (error) {
-                showMessage(errorMessage, 'Logout request failed. Please try again.', false);
-                logoutButton.disabled = false;
-                logoutButton.textContent = 'Logout';
-            }
-        });
-
-        // --- Update Profile ---
-        updateProfileForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            
-            const displayName = document.getElementById('updateDisplayName').value;
-            const phoneNumber = document.getElementById('updatePhoneNumber').value || null;
-            
-            // Validate phone number if provided
-            if (phoneNumber && !phoneNumber.match(/^\+[1-9]\d{1,14}$/)) {
-                showMessage(profileUpdateMessage, 'Phone number must be in E.164 format (e.g., +947XXXXXXXX)', false);
-                return;
-            }
-            
-            updateProfileButton.disabled = true;
-            updateProfileButton.textContent = 'Saving...';
-
-            try {
-                const response = await fetchApi('/users/me', {
-                    method: 'PUT',
-                    body: JSON.stringify({ display_name: displayName, phone_number: phoneNumber })
-                });
+            <div class="py-4 px-3">
+                <div class="mb-6 px-4">
+                    <div class="p-2 bg-kdj-red bg-opacity-10 rounded-lg">
+                        <h2 class="text-lg font-semibold text-kdj-dark">
+                            <span id="mobileSidebarGreeting">සුභ දවසක්</span>
+                        </h2>
+                        <p class="text-sm text-gray-600" id="mobileSidebarUserName">පරිශීලක</p>
+                    </div>
+                </div>
                 
-                const responseData = await response.json();
-                
-                if (response.ok) {
-                    showMessage(profileUpdateMessage, 'Profile updated successfully!', true);
+                <ul class="space-y-2 mt-4">
+                    <li>
+                        <a href="dashboard.php" class="sidebar-link active flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-tachometer-alt w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="profile.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-user w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>Profile</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="settings.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-cog w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="security.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-shield-alt w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>Security</span>
+                        </a>
+                    </li>
                     
-                    // Update displayed info immediately
-                    document.getElementById('profileDisplayName').textContent = responseData.display_name || '-';
-                    document.getElementById('profilePhoneNumber').textContent = responseData.phone_number || '-';
-                } else {
-                    let errorMessage = 'Profile update failed: ';
-                    if (responseData.detail) {
-                        errorMessage += responseData.detail;
-                    } else {
-                        errorMessage += response.statusText;
-                    }
-                    showMessage(profileUpdateMessage, errorMessage, false);
-                }
-            } catch (error) {
-                showMessage(profileUpdateMessage, 'Profile update request failed.', false);
-            } finally {
-                updateProfileButton.disabled = false;
-                updateProfileButton.textContent = 'Save Profile';
-            }
-        });
+                    <li class="border-t border-gray-200 my-4 pt-4">
+                        <h3 class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Applications
+                        </h3>
+                    </li>
+                    
+                    <li>
+                        <a href="https://singlish.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-language w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>KDJ Singlish</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://events.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-calendar-alt w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>KDJ Events</span>
+                        </a>
+                    </li>
+                    
+                    <li class="border-t border-gray-200 my-4 pt-2">
+                        <button id="mobileSidebarLogoutBtn" class="w-full flex items-center px-4 py-3 text-kdj-red hover:bg-red-50 rounded-md">
+                            <i class="fas fa-sign-out-alt w-5 h-5 mr-3"></i>
+                            <span>Logout</span>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
 
-        // --- Update Password ---
-        updatePasswordForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            
-            const currentPassword = document.getElementById('currentPassword').value;
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
-
-            if (newPassword !== confirmNewPassword) {
-                showMessage(passwordUpdateMessage, 'New passwords do not match!', false);
-                return;
-            }
-            
-            // Validate password strength
-            const passwordValidation = validatePassword(newPassword);
-            if (!passwordValidation.valid) {
-                showMessage(passwordUpdateMessage, 'Password is not strong enough: ' + passwordValidation.errors.join(', '), false);
-                return;
-            }
-            
-            updatePasswordButton.disabled = true;
-            updatePasswordButton.textContent = 'Updating...';
-
-            try {
-                const response = await fetchApi('/users/me/password', {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        current_password: currentPassword,
-                        new_password: newPassword
-                    })
-                });
+    <!-- Main content -->
+    <main class="content flex-1 p-6 md:p-8 pt-24 md:pt-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold text-kdj-dark mb-1">Dashboard</h1>
+                    <p class="text-gray-600">Welcome to your KDJ Lanka account dashboard</p>
+                </div>
                 
-                const responseData = await response.json();
-                
-                if (response.ok) {
-                    showMessage(passwordUpdateMessage, responseData.message || 'Password updated successfully!', true);
-                    updatePasswordForm.reset();
-                } else {
-                    let detail = responseData.detail || response.statusText;
-                    if (response.status === 400 && typeof responseData.detail === 'string') {
-                        detail = responseData.detail;
-                    }
-                    showMessage(passwordUpdateMessage, `Password update failed: ${detail}`, false);
-                }
-            } catch (error) {
-                showMessage(passwordUpdateMessage, 'Password update request failed.', false);
-            } finally {
-                updatePasswordButton.disabled = false;
-                updatePasswordButton.textContent = 'Update Password';
-            }
-        });
-
-        // --- Delete Account ---
-        deleteAccountButton.addEventListener('click', async () => {
-            if (!confirm('Are you absolutely sure you want to delete your account? This cannot be undone.')) return;
-            if (!confirm('Second confirmation: Really delete your account forever?')) return;
+                <div class="mt-4 md:mt-0 flex items-center">
+                    <span class="bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full flex items-center">
+                        <span class="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
+                        Active Account
+                    </span>
+                    <span id="emailVerificationBadge" class="hidden bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        Email Not Verified
+                    </span>
+                </div>
+            </div>
             
-            deleteAccountButton.disabled = true;
-            deleteAccountButton.textContent = 'Deleting...';
-
-            try {
-                const response = await fetchApi('/users/me', { method: 'DELETE' });
-                const responseData = await response.json();
+            <!-- User Profile Summary -->
+            <div class="bg-white shadow rounded-lg p-6 mb-8">
+                <div class="flex flex-col md:flex-row items-center">
+                    <div class="mb-4 md:mb-0 md:mr-6">
+                        <div class="bg-kdj-red rounded-full p-4 text-white">
+                            <i class="fas fa-user text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-semibold mb-2" id="profileName">Loading...</h2>
+                        <div class="flex flex-col md:flex-row md:space-x-6 text-gray-600">
+                            <div class="flex items-center mb-2 md:mb-0">
+                                <i class="fas fa-envelope mr-2 text-gray-400"></i>
+                                <span id="profileEmail">Loading...</span>
+                            </div>
+                            <div class="flex items-center mb-2 md:mb-0" id="profilePhoneContainer">
+                                <i class="fas fa-phone mr-2 text-gray-400"></i>
+                                <span id="profilePhone">Not set</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
+                                <span id="profileMFA">MFA: Disabled</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 md:mt-0">
+                        <a href="profile.php" class="text-kdj-red hover:text-red-800 flex items-center">
+                            Edit Profile
+                            <i class="fas fa-chevron-right ml-2"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <h2 class="text-xl font-semibold mb-4 text-kdj-dark">Quick Actions</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">Account Security</h3>
+                        <div class="p-2 bg-blue-100 rounded-md">
+                            <i class="fas fa-shield-alt text-blue-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Protect your account with additional security features.</p>
+                    <a href="security.php" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                        Configure Security
+                        <i class="fas fa-chevron-right ml-2"></i>
+                    </a>
+                </div>
                 
-                if (response.ok) {
-                    showMessage(deleteAccountMessage, responseData.message || 'Account deleted successfully.', true);
-                    setTimeout(() => { window.location.href = loginPageUrl; }, 3000);
-                } else {
-                    showMessage(deleteAccountMessage, `Account deletion failed: ${responseData.detail || response.statusText}`, false);
-                    deleteAccountButton.disabled = false;
-                    deleteAccountButton.textContent = 'Delete My Account';
-                }
-            } catch (error) {
-                showMessage(deleteAccountMessage, 'Account deletion request failed.', false);
-                deleteAccountButton.disabled = false;
-                deleteAccountButton.textContent = 'Delete My Account';
-            }
-        });
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">Update Profile</h3>
+                        <div class="p-2 bg-green-100 rounded-md">
+                            <i class="fas fa-user-edit text-green-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Keep your profile information up to date.</p>
+                    <a href="profile.php" class="text-green-600 hover:text-green-800 text-sm font-medium flex items-center">
+                        Edit Profile
+                        <i class="fas fa-chevron-right ml-2"></i>
+                    </a>
+                </div>
+                
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">Change Password</h3>
+                        <div class="p-2 bg-purple-100 rounded-md">
+                            <i class="fas fa-key text-purple-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Update your password regularly for better security.</p>
+                    <a href="settings.php" class="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center">
+                        Change Password
+                        <i class="fas fa-chevron-right ml-2"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- KDJ Services -->
+            <h2 class="text-xl font-semibold mb-4 text-kdj-dark">KDJ Services</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">KDJ Singlish</h3>
+                        <div class="p-2 bg-yellow-100 rounded-md">
+                            <i class="fas fa-language text-yellow-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Sinhala-English translation and language tools.</p>
+                    <a href="https://singlish.kdj.lk" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium flex items-center">
+                        Access Singlish
+                        <i class="fas fa-external-link-alt ml-2"></i>
+                    </a>
+                </div>
+                
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">KDJ Events</h3>
+                        <div class="p-2 bg-pink-100 rounded-md">
+                            <i class="fas fa-calendar-alt text-pink-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Discover and register for upcoming events in Sri Lanka.</p>
+                    <a href="https://events.kdj.lk" class="text-pink-600 hover:text-pink-800 text-sm font-medium flex items-center">
+                        Explore Events
+                        <i class="fas fa-external-link-alt ml-2"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
 
-        // --- Initial Load ---
+<?php
+// Page specific scripts
+$additional_scripts = <<<HTML
+<script>
+    // Configuration
+    const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
+    
+    // User profile data
+    let userData = null;
+    
+    // Set greeting based on time of day
+    function setGreeting() {
+        const hour = new Date().getHours();
+        let greeting = '';
+        
+        if (hour < 12) {
+            greeting = 'සුභ උදෑසනක්';
+        } else if (hour < 17) {
+            greeting = 'සුභ දහවලක්';
+        } else {
+            greeting = 'සුභ සන්ධ්‍යාවක්';
+        }
+        
+        document.getElementById('sidebarGreeting').textContent = greeting;
+        document.getElementById('mobileSidebarGreeting').textContent = greeting;
+    }
+    
+    // Load user profile data
+    async function loadUserProfile() {
+        try {
+            showLoading();
+            
+            const response = await fetch(`\${apiBaseUrl}/users/me`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch profile');
+            }
+            
+            userData = await response.json();
+            
+            // Update profile display
+            updateProfileDisplay(userData);
+            
+            hideLoading();
+        } catch (error) {
+            hideLoading();
+            console.error('Failed to load user profile:', error);
+            showToast('Failed to load profile data. Please try refreshing the page.', 'error');
+        }
+    }
+    
+    // Update profile display with user data
+    function updateProfileDisplay(user) {
+        // Update sidebar
+        document.getElementById('sidebarUserName').textContent = user.display_name || user.email;
+        document.getElementById('mobileSidebarUserName').textContent = user.display_name || user.email;
+        
+        // Update profile summary
+        document.getElementById('profileName').textContent = user.display_name || 'No name set';
+        document.getElementById('profileEmail').textContent = user.email;
+        
+        if (user.phone_number) {
+            document.getElementById('profilePhone').textContent = user.phone_number;
+        } else {
+            document.getElementById('profilePhone').textContent = 'Not set';
+        }
+        
+        document.getElementById('profileMFA').textContent = user.mfa_enabled ? 'MFA: Enabled' : 'MFA: Disabled';
+        
+        // Email verification badge
+        if (!user.email_verified) {
+            document.getElementById('emailVerificationBadge').classList.remove('hidden');
+        }
+        
+        // Update header nav
+        const userDisplayName = document.getElementById('userDisplayName');
+        if (userDisplayName) {
+            userDisplayName.textContent = user.display_name || user.email;
+        }
+    }
+    
+    // Mobile sidebar toggle
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
+    const closeMobileSidebar = document.getElementById('closeMobileSidebar');
+    
+    mobileSidebarToggle.addEventListener('click', function() {
+        mobileSidebar.classList.remove('hidden');
+        setTimeout(() => {
+            mobileSidebarContent.classList.remove('-translate-x-full');
+        }, 10);
+    });
+    
+    function closeSidebar() {
+        mobileSidebarContent.classList.add('-translate-x-full');
+        setTimeout(() => {
+            mobileSidebar.classList.add('hidden');
+        }, 300);
+    }
+    
+    closeMobileSidebar.addEventListener('click', closeSidebar);
+    
+    mobileSidebar.addEventListener('click', function(e) {
+        if (e.target === mobileSidebar) {
+            closeSidebar();
+        }
+    });
+    
+    // Sidebar logout
+    const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
+    const mobileSidebarLogoutBtn = document.getElementById('mobileSidebarLogoutBtn');
+    
+    function handleSidebarLogout() {
+        handleLogout();
+    }
+    
+    if (sidebarLogoutBtn) {
+        sidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
+    }
+    
+    if (mobileSidebarLogoutBtn) {
+        mobileSidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        setGreeting();
         loadUserProfile();
-    </script>
-</body>
-</html>
+    });
+</script>
+HTML;
+
+// Include footer
+include 'footer.php';
+?>
