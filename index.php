@@ -149,104 +149,113 @@ $additional_scripts = <<<HTML
     checkSession();
     
     loginForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
+    event.preventDefault();
+    
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const rememberMe = document.getElementById('remember_me').checked;
+    
+    // Basic client-side validation
+    if (!email || !password) {
+        showToast('Please enter both email and password', 'error');
+        return;
+    }
+    
+    if (!isValidEmail(email)) {
+        showToast('Please enter a valid email address', 'error');
+        return;
+    }
+    
+    // Disable button and show loading
+    submitButton.disabled = true;
+    const originalButtonText = submitButton.innerHTML;
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> සකසමින්...';
+    showLoading();
+    
+    try {
+        const response = await fetch(`${apiBaseUrl}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                password: password,
+                remember_me: rememberMe
+            }),
+            credentials: 'include'
+        });
         
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const rememberMe = document.getElementById('remember_me').checked;
+        const responseData = await response.json();
         
-        // Basic client-side validation
-        if (!email || !password) {
-            showToast('Please enter both email and password', 'error');
-            return;
-        }
-        
-        if (!isValidEmail(email)) {
-            showToast('Please enter a valid email address', 'error');
-            return;
-        }
-        
-        // Disable button and show loading
-        submitButton.disabled = true;
-        const originalButtonText = submitButton.innerHTML;
-        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> සකසමින්...';
-        showLoading();
-        
-        try {
-            const response = await fetch(`\${apiBaseUrl}/auth/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    email: email,
-                    password: password,
-                    remember_me: rememberMe
-                }),
-                credentials: 'include'
-            });
+        if (response.ok) {
+            showToast('සාර්ථකව ඇතුල් විය!', 'success');
             
-            const responseData = await response.json();
+            // Clear any previously stored tokens
+            sessionStorage.removeItem('auth_token');
             
-            if (response.ok) {
-                showToast('සාර්ථකව ඇතුල් විය!', 'success');
+            // Store tokens
+            if (responseData.access_token) {
+                // Always store in sessionStorage (cleared when browser is closed)
+                sessionStorage.setItem('auth_token', responseData.access_token);
                 
-                // Store tokens if needed
-                if (responseData.access_token) {
-                    // Store in sessionStorage for security (cleared when browser is closed)
-                    sessionStorage.setItem('auth_token', responseData.access_token);
-                    
-                    // If requested to remember, also store user ID for reference (not the token)
-                    if (rememberMe && responseData.user_id) {
-                        localStorage.setItem('user_id', responseData.user_id);
-                    }
+                // If requested to remember, also store user ID for reference (not the token)
+                if (rememberMe && responseData.user_id) {
+                    localStorage.setItem('user_id', responseData.user_id);
                 }
                 
-                // Check if MFA required
-                if (responseData.mfa_required && responseData.mfa_methods && responseData.mfa_methods.length > 0) {
-                    // Redirect to MFA page
-                    window.location.href = `mfa.php?methods=\${responseData.mfa_methods.join(',')}`;
-                    return;
-                }
-                
-                // Redirect after successful login
-                setTimeout(() => {
-                    window.location.href = redirectUrlAfterLogin;
-                }, 1000);
+                // For debugging, log token
+                console.log('Auth token stored in sessionStorage');
             } else {
-                // Login failed
-                let errorMessage = 'ඇතුල් වීමට නොහැක. ';
-                
-                if (responseData.detail) {
-                    if (typeof responseData.detail === 'string') {
-                        // Map common error messages to Sinhala
-                        if (responseData.detail.includes('Invalid email or password')) {
-                            errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
-                        } else if (responseData.detail.includes('Token expired')) {
-                            errorMessage = 'සැසිය කල් ඉකුත් වී ඇත. නැවත පුරනය කරන්න.';
-                        } else {
-                            errorMessage += responseData.detail;
-                        }
+                console.error('No access token received from server');
+            }
+            
+            // Check if MFA required
+            if (responseData.mfa_required && responseData.mfa_methods && responseData.mfa_methods.length > 0) {
+                // Redirect to MFA page
+                window.location.href = `mfa.php?methods=${responseData.mfa_methods.join(',')}`;
+                return;
+            }
+            
+            // Redirect after successful login
+            setTimeout(() => {
+                window.location.href = redirectUrlAfterLogin;
+            }, 1000);
+        } else {
+            // Login failed
+            let errorMessage = 'ඇතුල් වීමට නොහැක. ';
+            
+            if (responseData.detail) {
+                if (typeof responseData.detail === 'string') {
+                    // Map common error messages to Sinhala
+                    if (responseData.detail.includes('Invalid email or password')) {
+                        errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
+                    } else if (responseData.detail.includes('Token expired')) {
+                        errorMessage = 'සැසිය කල් ඉකුත් වී ඇත. නැවත පුරනය කරන්න.';
                     } else {
-                        errorMessage += JSON.stringify(responseData.detail);
+                        errorMessage += responseData.detail;
                     }
                 } else {
-                    errorMessage += `Error code: \${response.status}`;
+                    errorMessage += JSON.stringify(responseData.detail);
                 }
-                
-                showToast(errorMessage, 'error');
+            } else {
+                errorMessage += `Error code: ${response.status}`;
             }
-        } catch (error) {
-            // Network error or other issue
-            showToast('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
-        } finally {
-            // Re-enable button and hide loading
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalButtonText;
-            hideLoading();
+            
+            showToast(errorMessage, 'error');
         }
-    });
+    } catch (error) {
+        // Network error or other issue
+        console.error('Login error:', error);
+        showToast('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+    } finally {
+        // Re-enable button and hide loading
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalButtonText;
+        hideLoading();
+    }
+});
     
     // Email validation helper
     function isValidEmail(email) {
