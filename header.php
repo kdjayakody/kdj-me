@@ -44,8 +44,6 @@ if (isset($description)) {
     <meta property="og:image" content="/assets/images/kdj-og-image.jpg">
     <meta property="og:site_name" content="KDJ Lanka">
     
-    <!-- Cross-domain verification for kdj.lk subdomains -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' *.kdj.lk; script-src 'self' *.kdj.lk cdn.tailwindcss.com cdn.jsdelivr.net unpkg.com cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' *.kdj.lk cdn.tailwindcss.com cdn.jsdelivr.net unpkg.com cdnjs.cloudflare.com fonts.googleapis.com 'unsafe-inline'; font-src 'self' fonts.gstatic.com; img-src 'self' data: *.kdj.lk; connect-src 'self' *.kdj.lk;">
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
