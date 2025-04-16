@@ -4,7 +4,7 @@
  * Handles all API calls to the backend
  */
 
-const API_BASE_URL = '/api/v1';
+const API_BASE_URL = 'https://auth.kdj.lk/api/v1';
 
 const api = {
     /**
