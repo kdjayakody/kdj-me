@@ -1,4 +1,4 @@
-    <?php if (!in_array(basename($_SERVER['PHP_SELF']), ['index.php', 'register.php', 'forgot_password.php', 'reset_password.php'])): ?>
+<?php if (!in_array(basename($_SERVER['PHP_SELF']), ['index.php', 'register.php', 'forgot_password.php', 'reset_password.php'])): ?>
     <!-- Only show footer on non-auth pages -->
     <footer class="bg-kdj-dark text-white py-6 mt-auto">
         <div class="container mx-auto px-4">
@@ -98,25 +98,40 @@
         function handleLogout() {
             showLoading();
             
+            const authToken = sessionStorage.getItem('auth_token');
+            const headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            };
+            
+            // Add auth token if available
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
             fetch('https://auth.kdj.lk/api/v1/auth/logout', {
                 method: 'POST',
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
+                headers: headers
             })
             .then(response => {
-                if (response.ok) {
-                    window.location.href = '/index.php';
-                } else {
-                    hideLoading();
-                    showToast('Logout failed. Please try again.', 'error');
-                }
+                // Clear session storage regardless of response
+                sessionStorage.removeItem('auth_token');
+                sessionStorage.removeItem('token_expiry');
+                sessionStorage.removeItem('refresh_token');
+                localStorage.removeItem('user_id');
+                
+                // Redirect to login page
+                window.location.href = '/index.php';
             })
             .catch(error => {
-                hideLoading();
-                showToast('Network error. Please try again.', 'error');
+                // Still clear storage and redirect on error
+                sessionStorage.removeItem('auth_token');
+                sessionStorage.removeItem('token_expiry');
+                sessionStorage.removeItem('refresh_token');
+                localStorage.removeItem('user_id');
+                
+                window.location.href = '/index.php';
             });
         }
         
@@ -149,18 +164,53 @@
         function checkUserAuth() {
             if (window.location.pathname.includes('dashboard') || 
                 window.location.pathname.includes('profile') || 
-                window.location.pathname.includes('settings')) {
+                window.location.pathname.includes('settings') ||
+                window.location.pathname.includes('security')) {
+                
+                // Check if token is about to expire
+                const tokenExpiry = sessionStorage.getItem('token_expiry');
+                if (tokenExpiry && parseInt(tokenExpiry) - 300000 < Date.now()) {
+                    refreshAuthToken();
+                }
+                
+                // Get auth token from session storage
+                const authToken = sessionStorage.getItem('auth_token');
+                
+                // Prepare headers with token if available
+                const headers = {
+                    'Accept': 'application/json'
+                };
+                
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
                 
                 fetch('https://auth.kdj.lk/api/v1/users/me', {
                     method: 'GET',
                     credentials: 'include',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
+                    headers: headers
                 })
                 .then(response => {
                     if (!response.ok) {
-                        // Redirect to login if not authenticated
+                        console.error('Auth check failed: ' + response.status);
+                        // Clear session storage if unauthorized
+                        if (response.status === 401) {
+                            // Try to refresh the token
+                            return refreshAuthToken().then(refreshed => {
+                                if (!refreshed) {
+                                    sessionStorage.removeItem('auth_token');
+                                    sessionStorage.removeItem('token_expiry');
+                                    sessionStorage.removeItem('refresh_token');
+                                    window.location.href = '/index.php';
+                                    return null;
+                                }
+                                
+                                // If token refreshed, try to get user again
+                                return checkUserAuth();
+                            });
+                        }
+                        
+                        // Redirect to login for other errors
                         window.location.href = '/index.php';
                         return null;
                     }
@@ -183,9 +233,65 @@
             }
         }
 
+        // Refresh auth token
+        async function refreshAuthToken() {
+            const refreshToken = sessionStorage.getItem('refresh_token');
+            if (!refreshToken) return false;
+            
+            try {
+                const response = await fetch('https://auth.kdj.lk/api/v1/auth/refresh-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ refresh_token: refreshToken }),
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to refresh token:', response.status);
+                    return false;
+                }
+                
+                const data = await response.json();
+                
+                if (data.access_token) {
+                    // Store the new token
+                    sessionStorage.setItem('auth_token', data.access_token);
+                    
+                    // Update expiry time
+                    if (data.expires_in) {
+                        const expiryTime = Date.now() + (data.expires_in * 1000);
+                        sessionStorage.setItem('token_expiry', expiryTime.toString());
+                    }
+                    
+                    // Store refresh token if provided
+                    if (data.refresh_token) {
+                        sessionStorage.setItem('refresh_token', data.refresh_token);
+                    }
+                    
+                    return true;
+                }
+                
+                return false;
+            } catch (error) {
+                console.error('Token refresh error:', error);
+                return false;
+            }
+        }
+
         // Run auth check on protected pages
         document.addEventListener('DOMContentLoaded', function() {
             checkUserAuth();
+            
+            // Set up periodic token refresh every 5 minutes
+            setInterval(async () => {
+                const tokenExpiry = sessionStorage.getItem('token_expiry');
+                if (tokenExpiry && parseInt(tokenExpiry) - 300000 < Date.now()) {
+                    await refreshAuthToken();
+                }
+            }, 300000); // 5 minutes
         });
     </script>
     

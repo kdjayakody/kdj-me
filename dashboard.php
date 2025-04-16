@@ -356,24 +356,118 @@ $additional_scripts = <<<HTML
         document.getElementById('mobileSidebarGreeting').textContent = greeting;
     }
     
-    // Load user profile data
-    async function loadUserProfile() {
+    // Check if token expiration time is coming up
+    function isTokenExpiringSoon() {
+        const tokenExpiry = sessionStorage.getItem('token_expiry');
+        if (!tokenExpiry) return true;
+        
+        // Check if token expires in the next 5 minutes (300000 ms)
+        return parseInt(tokenExpiry) - 300000 < Date.now();
+    }
+    
+    // Refresh auth token
+    async function refreshAuthToken() {
+        const refreshToken = sessionStorage.getItem('refresh_token');
+        if (!refreshToken) return false;
+        
         try {
-            showLoading();
-            
-            const response = await fetch(`\${apiBaseUrl}/users/me`, {
-                method: 'GET',
+            const response = await fetch(`${apiBaseUrl}/auth/refresh-token`, {
+                method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
+                body: JSON.stringify({ refresh_token: refreshToken }),
                 credentials: 'include'
             });
             
             if (!response.ok) {
+                console.error('Failed to refresh token:', response.status);
+                return false;
+            }
+            
+            const data = await response.json();
+            
+            if (data.access_token) {
+                // Store the new token
+                sessionStorage.setItem('auth_token', data.access_token);
+                
+                // Update expiry time
+                if (data.expires_in) {
+                    const expiryTime = Date.now() + (data.expires_in * 1000);
+                    sessionStorage.setItem('token_expiry', expiryTime.toString());
+                }
+                
+                // Store refresh token if provided
+                if (data.refresh_token) {
+                    sessionStorage.setItem('refresh_token', data.refresh_token);
+                }
+                
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.error('Token refresh error:', error);
+            return false;
+        }
+    }
+    
+    // Load user profile data with token refresh
+    async function loadUserProfile() {
+        try {
+            // Check if token needs refresh
+            if (isTokenExpiringSoon()) {
+                const refreshed = await refreshAuthToken();
+                if (!refreshed) {
+                    // If refresh failed and we're not on login page, redirect
+                    if (!window.location.pathname.includes('index.php')) {
+                        console.log("Token refresh failed, redirecting to login");
+                        window.location.href = '/index.php';
+                        return;
+                    }
+                }
+            }
+            
+            showLoading();
+            
+            // Get auth token from session storage
+            const authToken = sessionStorage.getItem('auth_token');
+            
+            // Prepare headers with token if available
+            const headers = {
+                'Accept': 'application/json'
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            const response = await fetch(`${apiBaseUrl}/users/me`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: headers
+            });
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    // Clear session storage if unauthorized
+                    sessionStorage.removeItem('auth_token');
+                    sessionStorage.removeItem('token_expiry');
+                    
+                    // Redirect to login
+                    window.location.href = '/index.php';
+                    return;
+                }
+                
                 throw new Error('Failed to fetch profile');
             }
             
             userData = await response.json();
+            
+            // Update sidebar with user name
+            document.getElementById('sidebarUserName').textContent = userData.display_name || userData.email;
+            document.getElementById('mobileSidebarUserName').textContent = userData.display_name || userData.email;
             
             // Update profile display
             updateProfileDisplay(userData);
@@ -383,36 +477,51 @@ $additional_scripts = <<<HTML
             hideLoading();
             console.error('Failed to load user profile:', error);
             showToast('Failed to load profile data. Please try refreshing the page.', 'error');
+            
+            // If there's an auth error, redirect to login
+            if (error.message.includes('authentication') || error.message.includes('auth')) {
+                window.location.href = '/index.php';
+            }
         }
     }
     
     // Update profile display with user data
     function updateProfileDisplay(user) {
-        // Update sidebar
-        document.getElementById('sidebarUserName').textContent = user.display_name || user.email;
-        document.getElementById('mobileSidebarUserName').textContent = user.display_name || user.email;
-        
-        // Update profile summary
-        document.getElementById('profileName').textContent = user.display_name || 'No name set';
-        document.getElementById('profileEmail').textContent = user.email;
-        
-        if (user.phone_number) {
-            document.getElementById('profilePhone').textContent = user.phone_number;
-        } else {
-            document.getElementById('profilePhone').textContent = 'Not set';
-        }
-        
-        document.getElementById('profileMFA').textContent = user.mfa_enabled ? 'MFA: Enabled' : 'MFA: Disabled';
-        
-        // Email verification badge
-        if (!user.email_verified) {
-            document.getElementById('emailVerificationBadge').classList.remove('hidden');
-        }
-        
         // Update header nav
         const userDisplayName = document.getElementById('userDisplayName');
         if (userDisplayName) {
             userDisplayName.textContent = user.display_name || user.email;
+        }
+        
+        // Update profile summary elements
+        const profileName = document.getElementById('profileName');
+        const profileEmail = document.getElementById('profileEmail');
+        const profilePhone = document.getElementById('profilePhone');
+        const profileMFA = document.getElementById('profileMFA');
+        
+        if (profileName) profileName.textContent = user.display_name || 'No name set';
+        if (profileEmail) profileEmail.textContent = user.email;
+        
+        if (profilePhone) {
+            if (user.phone_number) {
+                profilePhone.textContent = user.phone_number;
+            } else {
+                profilePhone.textContent = 'Not set';
+            }
+        }
+        
+        if (profileMFA) {
+            profileMFA.textContent = user.mfa_enabled ? 'MFA: Enabled' : 'MFA: Disabled';
+        }
+        
+        // Email verification badge
+        const emailVerificationBadge = document.getElementById('emailVerificationBadge');
+        if (emailVerificationBadge) {
+            if (!user.email_verified) {
+                emailVerificationBadge.classList.remove('hidden');
+            } else {
+                emailVerificationBadge.classList.add('hidden');
+            }
         }
     }
     
@@ -464,6 +573,13 @@ $additional_scripts = <<<HTML
     document.addEventListener('DOMContentLoaded', function() {
         setGreeting();
         loadUserProfile();
+        
+        // Set up a periodic token refresh check every 5 minutes
+        setInterval(async () => {
+            if (isTokenExpiringSoon()) {
+                await refreshAuthToken();
+            }
+        }, 300000); // 5 minutes
     });
 </script>
 HTML;

@@ -127,12 +127,22 @@ $additional_scripts = <<<HTML
     // Check if user is already logged in
     async function checkSession() {
         try {
-            const response = await fetch(`\${apiBaseUrl}/users/me`, {
+            // Get auth token from session storage
+            const authToken = sessionStorage.getItem('auth_token');
+            
+            // Prepare headers with token if available
+            const headers = {
+                'Accept': 'application/json'
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            const response = await fetch(`${apiBaseUrl}/users/me`, {
                 method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                },
-                credentials: 'include'
+                credentials: 'include',
+                headers: headers
             });
             
             if (response.ok) {
@@ -173,7 +183,7 @@ $additional_scripts = <<<HTML
         showLoading();
         
         try {
-            const response = await fetch(`\${apiBaseUrl}/auth/login`, {
+            const response = await fetch(`${apiBaseUrl}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -192,12 +202,23 @@ $additional_scripts = <<<HTML
             if (response.ok) {
                 showToast('සාර්ථකව ඇතුල් විය!', 'success');
                 
-                // Store tokens if needed
+                // Store tokens consistently
                 if (responseData.access_token) {
-                    // Store in sessionStorage for security (cleared when browser is closed)
+                    // Store access token
                     sessionStorage.setItem('auth_token', responseData.access_token);
                     
-                    // If requested to remember, also store user ID for reference (not the token)
+                    // Store expiry time if provided
+                    if (responseData.expires_in) {
+                        const expiryTime = Date.now() + (responseData.expires_in * 1000);
+                        sessionStorage.setItem('token_expiry', expiryTime.toString());
+                    }
+                    
+                    // Store refresh token if provided
+                    if (responseData.refresh_token) {
+                        sessionStorage.setItem('refresh_token', responseData.refresh_token);
+                    }
+                    
+                    // If requested to remember, also store user ID for reference
                     if (rememberMe && responseData.user_id) {
                         localStorage.setItem('user_id', responseData.user_id);
                     }
@@ -206,7 +227,7 @@ $additional_scripts = <<<HTML
                 // Check if MFA required
                 if (responseData.mfa_required && responseData.mfa_methods && responseData.mfa_methods.length > 0) {
                     // Redirect to MFA page
-                    window.location.href = `mfa.php?methods=\${responseData.mfa_methods.join(',')}`;
+                    window.location.href = `mfa.php?methods=${responseData.mfa_methods.join(',')}`;
                     return;
                 }
                 
@@ -232,7 +253,7 @@ $additional_scripts = <<<HTML
                         errorMessage += JSON.stringify(responseData.detail);
                     }
                 } else {
-                    errorMessage += `Error code: \${response.status}`;
+                    errorMessage += `Error code: ${response.status}`;
                 }
                 
                 showToast(errorMessage, 'error');
