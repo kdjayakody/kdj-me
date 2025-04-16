@@ -109,7 +109,7 @@ function load_dotenv($path) {
 }
 
 // Load the .env file from the project root
-load_dotenv(BASE_PATH);
+// load_dotenv(BASE_PATH);
 
 // Example of overriding a define with an environment variable
 // Define API_BASE_URL using environment variable if available, otherwise use the default
