@@ -65,6 +65,7 @@ jobs:
           --exclude 'README.md' \
           --exclude 'composer.json' \
           --exclude 'composer.lock' \
+          --exclude '.user.ini' \
           ./ ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:${{ env.SERVER_PATH }}/
         # The './' source copies the content of the current directory
         # The trailing slash on SERVER_PATH/ is important for rsync
@@ -98,8 +99,11 @@ jobs:
 
           # Restart services (adjust service names if needed)
           echo "Restarting services..."
+          # IMPORTANT: Replace YOUR_PHP_VERSION with your actual version number, e.g., 81 or 8.1
+          # Check your actual service name on the server using: systemctl list-units | grep php
           sudo systemctl restart nginx    # Or 'httpd' if using Apache
           sudo systemctl restart php-fpm-YOUR_PHP_VERSION # e.g., php-fpm-81 for PHP 8.1
 
           echo "Deployment successful!"
         EOF
+
