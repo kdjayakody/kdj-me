@@ -1,9 +1,9 @@
-name: Deploy PHP Frontend to aaPanel
+name: Deploy to aaPanel
 
 on:
   push:
     branches:
-      - main # Trigger deployment on pushes to the main branch
+      - main
 
 jobs:
   deploy:
@@ -13,97 +13,42 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.1' # Specify your desired PHP version
-        extensions: mbstring, xml, curl, zip, gd, iconv # Add extensions required by your project or composer packages
-        coverage: none
-
-    - name: Validate composer.json and composer.lock
-      run: composer validate --strict
-
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v3
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-php-
-
-    - name: Install Composer Dependencies
-      run: composer install --prefer-dist --no-progress --no-dev --optimize-autoloader
-      # --no-dev: Skips development dependencies
-      # --optimize-autoloader: Creates a faster autoloader for production
-
     - name: Set up SSH
       uses: webfactory/ssh-agent@v0.7.0
       with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }} # Your server's private SSH key
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Configure SSH
       run: |
         mkdir -p ~/.ssh
-        echo -e "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile=/dev/null\n" > ~/.ssh/config
-        # Added UserKnownHostsFile=/dev/null to avoid issues if host key changes
+        echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
 
-    - name: Deploy files using rsync
-      env:
-        SERVER_USER: ${{ secrets.SERVER_USER }} # e.g., 'root' or another user with SSH access
-        SERVER_IP: ${{ secrets.SERVER_IP }}     # Your server's IP address
-        SERVER_PATH: ${{ secrets.SERVER_PATH }} # e.g., /www/wwwroot/yourdomain.com/kdj-php-frontend
+    - name: Prepare for deployment
       run: |
-        echo "Deploying to server..."
-        # Use rsync to efficiently copy files, excluding unnecessary ones
-        # Ensure SERVER_PATH includes the final project directory name
-        rsync -avz --delete \
-          --exclude '.git/' \
-          --exclude '.github/' \
-          --exclude '.gitignore' \
-          --exclude '.env' \
-          --exclude 'README.md' \
-          --exclude 'composer.json' \
-          --exclude 'composer.lock' \
-          --exclude '.user.ini' \
-          ./ ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:${{ env.SERVER_PATH }}/
-        # The './' source copies the content of the current directory
-        # The trailing slash on SERVER_PATH/ is important for rsync
+        # Create a list of files to deploy, excluding secrets and .htaccess
+        find . -type f -not -path "./data/*" -not -path "./.git/*" -not -name ".htaccess" > files_to_deploy.txt
+        mkdir -p to_deploy
+        while IFS= read -r file; do
+          mkdir -p "to_deploy/$(dirname "$file")"
+          cp "$file" "to_deploy/$file"
+        done < files_to_deploy.txt
 
-    - name: Execute post-deployment commands on server
+    - name: Deploy to server
       env:
         SERVER_USER: ${{ secrets.SERVER_USER }}
         SERVER_IP: ${{ secrets.SERVER_IP }}
         SERVER_PATH: ${{ secrets.SERVER_PATH }}
       run: |
-        ssh ${{ env.SERVER_USER }}@${{ env.SERVER_IP }} << EOF
-          cd ${{ env.SERVER_PATH }}
-
-          # Set correct ownership (www:www is common for aaPanel/Nginx/Apache)
-          # Verify this matches your server setup
-          echo "Setting ownership..."
-          sudo chown -R www:www .
-
-          # Set correct permissions
-          # Directories 755, files 644 is standard practice
-          echo "Setting permissions..."
-          sudo find . -type d -exec chmod 755 {} \;
-          sudo find . -type f -exec chmod 644 {} \;
-          # Ensure PHP can write to specific cache/log directories if needed (adjust path)
-          # Example: sudo chown -R www:www storage/ cache/
-          # Example: sudo chmod -R 775 storage/ cache/
-
-          # Clear any application cache (if applicable)
-          # echo "Clearing cache..."
-          # php artisan cache:clear # Example for Laravel
-
-          # Restart services (adjust service names if needed)
-          echo "Restarting services..."
-          # IMPORTANT: Replace YOUR_PHP_VERSION with your actual version number, e.g., 81 or 8.1
-          # Check your actual service name on the server using: systemctl list-units | grep php
-          sudo systemctl restart nginx    # Or 'httpd' if using Apache
-          sudo systemctl restart php-fpm-YOUR_PHP_VERSION # e.g., php-fpm-81 for PHP 8.1
-
-          echo "Deployment successful!"
+        echo "Deploying to server..."
+        # Use scp with recursive option to copy the directory structure
+        scp -r to_deploy/* $SERVER_USER@$SERVER_IP:$SERVER_PATH/
+        
+        # Execute commands on the server
+        ssh $SERVER_USER@$SERVER_IP << EOF
+        cd $SERVER_PATH
+        sudo chown -R www:www .
+        sudo chmod -R 755 .
+        sudo service nginx restart
+        sudo service php-fpm restart
+        echo "Deployment successful!"
         EOF
-
