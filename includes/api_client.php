@@ -111,15 +111,93 @@ function api_register_user(string $username, string $email, string $password): a
  *
  * @param string $email The user's email address.
  * @param string $password The user's password.
- * @return array The API response ('status' and 'body'). Expected body includes 'token' and 'user' details on success.
+ * @param bool $rememberMe Whether to implement a "remember me" functionality.
+ * @return array An associative array with login result details:
+ *               - 'success' (bool): Whether login was successful
+ *               - 'data' (array|null): User and token data if successful
+ *               - 'error_message' (string|null): Error message if login failed
+ *               - 'status_code' (int): HTTP status code of the response
  */
-function api_login_user(string $email, string $password): array {
-    return _make_api_request('POST', '/users/login', [
-        'email' => $email,
-        'password' => $password
-    ]);
-}
+function api_login_user(string $email, string $password, bool $rememberMe = false): array {
+    try {
+        // Log the attempt for debugging
+        error_log("Attempting login for email: $email");
 
+        // Prepare login data
+        $loginData = [
+            'email' => $email,
+            'password' => $password,
+            'remember_me' => $rememberMe
+        ];
+
+        // Make the API request
+        $response = _make_api_request('POST', '/users/login', $loginData);
+
+        // Log the full response for debugging
+        error_log("Login API Response: " . json_encode($response));
+
+        // Check if the response has the expected structure
+        if (!isset($response['status']) || !isset($response['body'])) {
+            error_log("Unexpected API response structure");
+            return [
+                'success' => false,
+                'error_message' => 'Unexpected server response',
+                'status_code' => 500,
+                'data' => null
+            ];
+        }
+
+        // Handle different response scenarios
+        $httpStatus = $response['status'];
+        $responseBody = $response['body'];
+
+        // Successful login
+        if ($httpStatus >= 200 && $httpStatus < 300) {
+            // Check for required login data
+            if (!isset($responseBody['access_token']) || !isset($responseBody['user'])) {
+                error_log("Missing access token or user data in login response");
+                return [
+                    'success' => false,
+                    'error_message' => 'Invalid login response from server',
+                    'status_code' => $httpStatus,
+                    'data' => null
+                ];
+            }
+
+            return [
+                'success' => true,
+                'data' => [
+                    'access_token' => $responseBody['access_token'],
+                    'refresh_token' => $responseBody['refresh_token'] ?? null,
+                    'expires_in' => $responseBody['expires_in'] ?? 3600,
+                    'user_id' => $responseBody['user']['id'] ?? null,
+                    'email' => $responseBody['user']['email'] ?? null,
+                    'display_name' => $responseBody['user']['display_name'] ?? null,
+                ],
+                'error_message' => null,
+                'status_code' => $httpStatus
+            ];
+        }
+
+        // Handle login failure
+        return [
+            'success' => false,
+            'error_message' => $responseBody['message'] ?? 'Login failed',
+            'status_code' => $httpStatus,
+            'data' => null
+        ];
+
+    } catch (Exception $e) {
+        // Log any unexpected errors
+        error_log("Unexpected error during login: " . $e->getMessage());
+        return [
+            'success' => false,
+            'error_message' => 'An unexpected error occurred',
+            'status_code' => 500,
+            'data' => null
+        ];
+    }
+}
 /**
  * Verifies a user's email address using a token.
  *

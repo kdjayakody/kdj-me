@@ -64,7 +64,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 5. Process API Response
             if ($result['success']) {
                 // API login successful, store auth data in session
-                // $result['data'] should contain tokens and user info from API response
                 if (isset($result['data']) && login_user($result['data'])) {
                     // Session login successful, redirect to dashboard
                     redirect('/dashboard.php');
@@ -80,8 +79,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
                 // Use the error message from the API if available, otherwise generic
                 $messageText = $result['error_message'] ?? 'Invalid email or password.';
-                // Log the detailed error for debugging if needed
-                error_log("API Login Failed: Status {$result['status_code']}, Message: {$result['error_message']}");
+                
+                // Enhanced logging for debugging
+                error_log(sprintf(
+                    "Login Failed - Email: %s, Status Code: %d, Error: %s", 
+                    $email, 
+                    $result['status_code'], 
+                    $result['error_message'] ?? 'Unknown error'
+                ));
             }
         }
     }
