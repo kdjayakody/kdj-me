@@ -1,0 +1,459 @@
+/**
+ * Main Stylesheet for KDJ PHP Frontend
+ *
+ * Provides basic styling for layout, typography, forms, buttons, and messages.
+ */
+
+/* --- CSS Variables (Customize Colors, Fonts, etc. here) --- */
+:root {
+    --primary-color: #007bff; /* Example: Blue */
+    --secondary-color: #6c757d; /* Example: Gray */
+    --success-color: #28a745; /* Example: Green */
+    --danger-color: #dc3545; /* Example: Red */
+    --warning-color: #ffc107; /* Example: Yellow */
+    --info-color: #17a2b8; /* Example: Teal */
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    --text-color: #212529;
+    --link-color: var(--primary-color);
+    --link-hover-color: darken(var(--primary-color), 10%);
+    --background-color: #ffffff;
+    --border-color: #dee2e6;
+    --input-border-color: #ced4da;
+    --input-focus-border-color: #80bdff;
+    --input-focus-box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+
+    --font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+    --border-radius: 0.25rem;
+    --form-padding: 0.75rem;
+    --form-margin-bottom: 1rem;
+}
+
+/* --- Base & Reset Styles --- */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px; /* Base font size */
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-family-sans-serif);
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--background-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* --- Layout --- */
+.container {
+    width: 100%;
+    max-width: 1140px; /* Adjust max width as needed */
+    margin-right: auto;
+    margin-left: auto;
+    padding-right: 15px;
+    padding-left: 15px;
+}
+
+.main-header {
+    background-color: var(--dark-color);
+    color: var(--light-color);
+    padding: 0.5rem 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.main-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+    padding: 0.5rem 0; /* Padding within the container */
+    max-width: 1140px; /* Match container */
+    margin: 0 auto;
+    padding-right: 15px;
+    padding-left: 15px;
+}
+
+.nav-brand a {
+    color: var(--light-color);
+    text-decoration: none;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.nav-links {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap; /* Allow wrapping */
+    gap: 1rem; /* Spacing between links */
+}
+
+.nav-links a {
+    color: var(--light-color);
+    text-decoration: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--border-radius);
+    transition: background-color 0.2s ease-in-out;
+}
+
+.nav-links a:hover,
+.nav-links a:focus {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Style for logout button within nav */
+.nav-logout-button {
+    background: none;
+    border: none;
+    color: var(--light-color);
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--border-radius);
+    transition: background-color 0.2s ease-in-out;
+}
+.nav-logout-button:hover,
+.nav-logout-button:focus {
+     background-color: rgba(255, 255, 255, 0.1);
+}
+
+.main-content {
+    flex-grow: 1; /* Make content area fill available space */
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+.main-footer {
+    background-color: var(--light-color);
+    color: var(--secondary-color);
+    padding: 1.5rem 0;
+    margin-top: auto; /* Push footer to bottom */
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+/* --- Typography --- */
+h1, h2, h3, h4, h5, h6 {
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--dark-color);
+}
+
+h1 { font-size: 2.25rem; }
+h2 { font-size: 1.8rem; }
+h3 { font-size: 1.5rem; }
+p { margin-bottom: 1rem; }
+
+a {
+    color: var(--link-color);
+    text-decoration: none;
+    transition: color 0.2s ease-in-out;
+}
+
+a:hover, a:focus {
+    color: var(--link-hover-color);
+    text-decoration: underline;
+}
+
+code {
+    font-family: var(--font-family-monospace);
+    background-color: var(--light-color);
+    padding: 0.2em 0.4em;
+    border-radius: var(--border-radius);
+    font-size: 0.9em;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 1.5rem 0;
+}
+
+/* --- Forms --- */
+.form-group {
+    margin-bottom: var(--form-margin-bottom);
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+textarea,
+select {
+    display: block;
+    width: 100%;
+    padding: var(--form-padding);
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--text-color);
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--border-radius);
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="tel"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+    color: var(--text-color);
+    background-color: #fff;
+    border-color: var(--input-focus-border-color);
+    outline: 0;
+    box-shadow: var(--input-focus-box-shadow);
+}
+
+input[readonly], input[disabled] {
+    background-color: var(--light-color);
+    opacity: 0.7;
+}
+
+.form-check {
+    display: flex;
+    align-items: center;
+}
+
+.form-check input[type="checkbox"] {
+    width: auto; /* Don't make checkboxes full width */
+    margin-right: 0.5rem;
+}
+
+.form-check label {
+    margin-bottom: 0; /* Align label with checkbox */
+    font-weight: normal;
+}
+
+small {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875em;
+    color: var(--secondary-color);
+}
+
+.error-text {
+    color: var(--danger-color);
+    font-size: 0.875em;
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.form-links {
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+}
+.form-links p {
+    margin-bottom: 0.5rem;
+}
+
+/* Limit form width on larger screens (optional) */
+.login-form, .register-form, .forgot-password-form, .reset-password-form,
+.profile-form, .password-change-form, .mfa-verify-form {
+    max-width: 500px; /* Adjust as needed */
+    margin: 0 auto; /* Center the form */
+    padding: 2rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: #fff; /* Add background if body bg is different */
+}
+
+
+/* --- Buttons --- */
+.button {
+    display: inline-block;
+    font-weight: 400;
+    color: var(--text-color);
+    text-align: center;
+    vertical-align: middle;
+    cursor: pointer;
+    user-select: none;
+    background-color: transparent;
+    border: 1px solid transparent;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    border-radius: var(--border-radius);
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.button:hover {
+    text-decoration: none;
+}
+
+.button:focus {
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.5); /* Adjust focus color */
+}
+
+.button-primary {
+    color: #fff;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+.button-primary:hover {
+    background-color: darken(var(--primary-color), 10%);
+    border-color: darken(var(--primary-color), 12%);
+}
+
+.button-secondary {
+    color: #fff;
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
+.button-secondary:hover {
+     background-color: darken(var(--secondary-color), 10%);
+    border-color: darken(var(--secondary-color), 12%);
+}
+
+.button-danger {
+    color: #fff;
+    background-color: var(--danger-color);
+    border-color: var(--danger-color);
+}
+.button-danger:hover {
+     background-color: darken(var(--danger-color), 10%);
+    border-color: darken(var(--danger-color), 12%);
+}
+
+/* Make buttons full width within forms if desired */
+.form-group > .button {
+     width: 100%;
+}
+
+
+/* --- Messages & Alerts --- */
+.flash-messages {
+    margin-bottom: 1.5rem;
+}
+
+.message {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius);
+    position: relative; /* For potential close button */
+}
+.message p:last-child {
+    margin-bottom: 0; /* Remove extra margin from paragraph inside */
+}
+
+.message-success {
+    color: darken(var(--success-color), 15%);
+    background-color: lighten(var(--success-color), 35%);
+    border-color: lighten(var(--success-color), 25%);
+}
+
+.message-error {
+    color: darken(var(--danger-color), 15%);
+    background-color: lighten(var(--danger-color), 38%);
+    border-color: lighten(var(--danger-color), 30%);
+}
+
+.message-warning {
+    color: darken(var(--warning-color), 30%);
+    background-color: lighten(var(--warning-color), 35%);
+    border-color: lighten(var(--warning-color), 30%);
+}
+
+.message-info {
+    color: darken(var(--info-color), 15%);
+    background-color: lighten(var(--info-color), 40%);
+    border-color: lighten(var(--info-color), 30%);
+}
+
+/* --- MFA Display Specific --- */
+.mfa-setup-container {
+    /* Add specific container styles if needed */
+}
+
+.mfa-qr-code {
+    margin: 1rem 0;
+    text-align: center; /* Center the QR code */
+}
+.mfa-qr-code img {
+    max-width: 200px; /* Adjust size */
+    height: auto;
+    border: 1px solid var(--border-color);
+    padding: 5px;
+}
+
+.mfa-secret-key {
+    margin: 1rem 0;
+    font-size: 1.1rem;
+    word-break: break-all; /* Prevent long keys overflowing */
+}
+
+.mfa-backup-codes {
+    margin: 1rem 0;
+    background-color: var(--light-color);
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    border-radius: var(--border-radius);
+}
+.mfa-backup-codes ul {
+    list-style: none;
+    padding-left: 0;
+    columns: 2; /* Display codes in columns if space allows */
+    column-gap: 2rem;
+}
+.mfa-backup-codes li {
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+/* --- Welcome Page Specific --- */
+.welcome-container {
+    /* Styles defined inline in index.php, can be moved here */
+}
+.welcome-actions .button {
+     padding: 0.75rem 1.5rem; /* Make buttons larger */
+}
+
+
+/* --- Responsiveness (Example) --- */
+@media (max-width: 768px) {
+    .main-nav {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .nav-links {
+        margin-top: 0.5rem;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%; /* Stack links vertically */
+        gap: 0.5rem;
+    }
+    .nav-links a, .nav-logout-button {
+         display: block; /* Make links take full width */
+         width: 100%;
+         text-align: left;
+    }
+    .mfa-backup-codes ul {
+        columns: 1; /* Stack codes in one column */
+    }
+}
+
