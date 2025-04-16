@@ -4,115 +4,81 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - kdj.lk</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-color: #f4f4f4;
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        kdjred: '#cb2127',
+                        kdjdark: '#141a20',
+                    }
+                }
+            }
         }
-        .login-container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            width: 300px;
-        }
-        .login-container h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #333;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-        }
-        .form-group input[type="email"],
-        .form-group input[type="password"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box; /* Important */
-        }
-        .form-group input[type="checkbox"] {
-            margin-right: 5px;
-        }
-        .form-group button {
-            width: 100%;
-            padding: 10px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .form-group button:hover {
-            background-color: #0056b3;
-        }
-        #message {
-            margin-top: 15px;
-            padding: 10px;
-            border-radius: 4px;
-            text-align: center;
-            font-size: 14px;
-        }
-        .message-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .message-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .links {
-            margin-top: 15px;
-            text-align: center;
-            font-size: 14px;
-        }
-        .links a {
-            color: #007bff;
-            text-decoration: none;
-            margin: 0 10px;
-        }
-        .links a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    </script>
 </head>
-<body>
-    <div class="login-container">
-        <h2>ඇතුල් වන්න</h2>
-        <form id="loginForm">
-            <div class="form-group">
-                <label for="email">ඊමේල් ලිපිනය:</label>
-                <input type="email" id="email" name="email" required>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-lg max-w-md w-full p-8">
+        <div class="text-center mb-8">
+            <!-- Add KDJ logo here if available -->
+            <h2 class="text-2xl font-bold text-kdjdark">ඇතුල් වන්න</h2>
+        </div>
+        
+        <form id="loginForm" class="space-y-6">
+            <div>
+                <label for="email" class="block text-sm font-medium text-kdjdark mb-1">ඊමේල් ලිපිනය:</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-regular fa-envelope text-gray-400"></i>
+                    </div>
+                    <input type="email" id="email" name="email" required 
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-kdjred focus:border-kdjred sm:text-sm"
+                        placeholder="your@email.com">
+                </div>
             </div>
-            <div class="form-group">
-                <label for="password">මුරපදය:</label>
-                <input type="password" id="password" name="password" required>
+            
+            <div>
+                <label for="password" class="block text-sm font-medium text-kdjdark mb-1">මුරපදය:</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-lock text-gray-400"></i>
+                    </div>
+                    <input type="password" id="password" name="password" required 
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-kdjred focus:border-kdjred sm:text-sm">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                        <button type="button" id="togglePassword" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <input type="checkbox" id="remember_me" name="remember_me">
-                <label for="remember_me">මතක තබාගන්න</label>
+            
+            <div class="flex items-center">
+                <input id="remember_me" name="remember_me" type="checkbox" 
+                    class="h-4 w-4 border-gray-300 rounded text-kdjred focus:ring-kdjred">
+                <label for="remember_me" class="ml-2 block text-sm text-gray-700">මතක තබාගන්න</label>
             </div>
-            <div class="form-group">
-                <button type="submit" id="submitButton">ඇතුල් වන්න</button>
+            
+            <div>
+                <button type="submit" id="submitButton" 
+                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-kdjred hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdjred transition duration-150">
+                    <span id="buttonText">ඇතුල් වන්න</span>
+                    <span id="buttonLoader" class="hidden ml-2">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                    </span>
+                </button>
             </div>
         </form>
-        <div id="message" style="display: none;"></div>
-        <div class="links">
-            <a href="register.php">ලියාපදිංචි වන්න</a>
-            <a href="forgot_password.php">මුරපදය අමතකද?</a>
+        
+        <div id="message" class="mt-4 p-3 rounded-md text-center hidden"></div>
+        
+        <div class="mt-6 text-center space-y-2">
+            <a href="register.php" class="block text-sm font-medium text-kdjred hover:text-red-800 transition">ලියාපදිංචි වන්න</a>
+            <a href="forgot_password.php" class="block text-sm font-medium text-kdjred hover:text-red-800 transition">මුරපදය අමතකද?</a>
         </div>
     </div>
 
@@ -125,10 +91,26 @@
         const loginForm = document.getElementById('loginForm');
         const messageDiv = document.getElementById('message');
         const submitButton = document.getElementById('submitButton');
+        const buttonText = document.getElementById('buttonText');
+        const buttonLoader = document.getElementById('buttonLoader');
+        const togglePasswordButton = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+
+        // Toggle password visibility
+        togglePasswordButton.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            // Toggle icon
+            this.innerHTML = type === 'password' ? '<i class="fa-regular fa-eye"></i>' : '<i class="fa-regular fa-eye-slash"></i>';
+        });
 
         // Check if user is already logged in
         async function checkSession() {
             try {
+                submitButton.disabled = true;
+                buttonText.textContent = 'සැසිය පරීක්ෂා කරමින්...';
+                buttonLoader.classList.remove('hidden');
+                
                 const response = await fetch('https://auth.kdj.lk/api/v1/users/me', {
                     method: 'GET',
                     headers: {
@@ -140,10 +122,17 @@
                 if (response.ok) {
                     // User is already logged in, redirect to dashboard
                     window.location.href = redirectUrlAfterLogin;
+                } else {
+                    submitButton.disabled = false;
+                    buttonText.textContent = 'ඇතුල් වන්න';
+                    buttonLoader.classList.add('hidden');
                 }
             } catch (error) {
                 // Ignore errors - just proceed with login form
                 console.log("No active session found");
+                submitButton.disabled = false;
+                buttonText.textContent = 'ඇතුල් වන්න';
+                buttonLoader.classList.add('hidden');
             }
         }
 
@@ -152,8 +141,13 @@
 
         function showMessage(text, isError = false) {
             messageDiv.textContent = text;
-            messageDiv.className = isError ? 'message-error' : 'message-success';
-            messageDiv.style.display = 'block';
+            messageDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+            
+            if (isError) {
+                messageDiv.classList.add('bg-red-100', 'text-red-800');
+            } else {
+                messageDiv.classList.add('bg-green-100', 'text-green-800');
+            }
         }
 
         loginForm.addEventListener('submit', async (event) => {
@@ -164,13 +158,18 @@
             const rememberMe = document.getElementById('remember_me').checked;
 
             // Clear previous messages
-            messageDiv.style.display = 'none';
-            messageDiv.textContent = '';
-            messageDiv.className = '';
+            messageDiv.classList.add('hidden');
+            
+            // Basic validation
+            if (!email || !password) {
+                showMessage('කරුණාකර ඊමේල් සහ මුරපදය ඇතුලත් කරන්න.', true);
+                return;
+            }
 
             // Disable button to prevent multiple submissions
             submitButton.disabled = true;
-            submitButton.textContent = 'Processing...';
+            buttonText.textContent = 'ඇතුල් වෙමින්...';
+            buttonLoader.classList.remove('hidden');
 
             try {
                 const response = await fetch(loginApiUrl, {
@@ -191,6 +190,21 @@
 
                 if (response.ok) {
                     showMessage('සාර්ථකව ඇතුල් විය!', false);
+                    
+                    // Handle MFA if required
+                    if (responseData.mfa_required) {
+                        // Redirect to MFA verification page
+                        window.location.href = 'mfa_verify.php';
+                        return;
+                    }
+
+                    // Store tokens in localStorage if needed (for API calls)
+                    if (responseData.access_token) {
+                        localStorage.setItem('access_token', responseData.access_token);
+                        if (responseData.refresh_token) {
+                            localStorage.setItem('refresh_token', responseData.refresh_token);
+                        }
+                    }
 
                     // Redirect after successful login
                     setTimeout(() => {
@@ -207,6 +221,8 @@
                                 errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
                             } else if (responseData.detail.includes('Token expired')) {
                                 errorMessage = 'සැසිය කල් ඉකුත් වී ඇත. නැවත පුරනය කරන්න.';
+                            } else if (responseData.detail.includes('Account temporarily locked')) {
+                                errorMessage = 'ගිණුම තාවකාලිකව අගුළු දමා ඇත. පසුව නැවත උත්සාහ කරන්න.';
                             } else {
                                 errorMessage += responseData.detail;
                             }
@@ -216,18 +232,20 @@
                             errorMessage += JSON.stringify(responseData.detail);
                         }
                     } else {
-                        errorMessage += `Error code: ${response.status}`;
+                        errorMessage += `දෝෂ කේතය: ${response.status}`;
                     }
                     
                     showMessage(errorMessage, true);
                 }
             } catch (error) {
                 // Network error or other issue
-                showMessage('Login request එක යැවීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', true);
+                showMessage('ඇතුල් වීමේ ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සාහ කරන්න.', true);
+                console.error('Login error:', error);
             } finally {
                 // Re-enable button
                 submitButton.disabled = false;
-                submitButton.textContent = 'ඇතුල් වන්න';
+                buttonText.textContent = 'ඇතුල් වන්න';
+                buttonLoader.classList.add('hidden');
             }
         });
     </script>
