@@ -203,34 +203,37 @@ const auth = {
      */
     async verifyMfaLogin(code, method = 'totp') {
         try {
+            // Get the pending MFA token
             const pendingToken = localStorage.getItem('pending_mfa_token');
-            const userId = localStorage.getItem('pending_mfa_user_id');
-    
-            if (!pendingToken || !userId) {
-                throw new Error('No pending authentication found');
+            
+            if (!pendingToken) {
+                throw new Error('No pending MFA verification found');
             }
-    
-            const response = await api.post('/auth/mfa/verify', {
-                code,
-                method
-            }, {
-                // Include the pending token in the Authorization header
-                headers: {
-                    'Authorization': `Bearer ${pendingToken}`
-                }
-            });
-    
-            // Clear pending MFA storage
+            
+            // Call API to verify MFA
+            const result = await api.verifyMfa(code, method);
+            
+            // Get complete auth data after MFA verification
+            const userId = localStorage.getItem('pending_mfa_user_id');
+            
+            // Create auth data object
+            const authData = {
+                access_token: pendingToken,
+                token_type: 'bearer',
+                expires_in: 1800, // 30 minutes
+                user_id: userId,
+                mfa_required: false
+            };
+            
+            // Set the session
+            this.setSession(authData);
+            
+            // Clean up pending MFA data
             localStorage.removeItem('pending_mfa_token');
             localStorage.removeItem('pending_mfa_user_id');
-            localStorage.removeItem('mfa_methods');
-    
-            // Store final authentication tokens
-            this.setAuthTokens(response);
-    
-            return response;
+            
+            return result;
         } catch (error) {
-            console.error('MFA verification error:', error);
             throw error;
         }
     },
