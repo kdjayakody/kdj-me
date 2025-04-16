@@ -1,251 +1,243 @@
 <?php
-/**
- * API Client Functions
- *
- * Functions for interacting with the kdj-auth Python backend API.
- * Uses PHP's cURL extension.
- * Assumes config.php and session_manager.php are included.
- *
- * NOTE: Using a dedicated HTTP client library like GuzzleHttp (via Composer)
- * is generally recommended for more complex scenarios as it simplifies request
- * building, response handling, and error management.
- */
+// api_client.php
 
 /**
- * Core function to make requests to the API.
+ * Makes a request to the backend API.
  *
- * @param string $method HTTP method (GET, POST, PUT, DELETE).
- * @param string $endpoint API endpoint path (e.g., '/auth/login').
- * @param array|null $data Data payload for POST/PUT requests.
- * @param bool $sendAuthToken Whether to include the Authorization header.
- * @return array ['success' => bool, 'status_code' => int, 'data' => array|null, 'error_message' => string|null]
+ * This is a private helper function used by other functions in this file
+ * to interact with the API endpoints. It handles setting up the cURL request,
+ * sending it, and processing the response.
+ *
+ * @param string $method The HTTP method (e.g., 'GET', 'POST').
+ * @param string $endpoint The API endpoint path (e.g., '/users/register').
+ * @param array|null $data The data to send with the request (for POST, PUT, etc.).
+ * @param array $headers Optional additional headers for the request.
+ * @return array An associative array containing 'status' (HTTP status code) and 'body' (decoded JSON response or error message).
  */
-function _make_api_request(string $method, string $endpoint, ?array $data = null, bool $sendAuthToken = false): array
-{
-    // Ensure API_BASE_URL is defined
-    if (!defined('API_BASE_URL')) {
-        error_log('CRITICAL: API_BASE_URL constant not defined.');
-        return ['success' => false, 'status_code' => 0, 'data' => null, 'error_message' => 'API client configuration error.'];
-    }
-
+function _make_api_request(string $method, string $endpoint, ?array $data = null, array $headers = []): array {
+    // Construct the full URL for the API endpoint.
+    // It ensures there's exactly one slash between the base URL and the endpoint.
     $url = rtrim(API_BASE_URL, '/') . '/' . ltrim($endpoint, '/');
-    $method = strtoupper($method);
 
-    $ch = curl_init();
-    if ($ch === false) {
-        error_log('CRITICAL: Failed to initialize cURL.');
-        return ['success' => false, 'status_code' => 0, 'data' => null, 'error_message' => 'cURL initialization failed.'];
+    // --- DEBUGGING START ---
+    // Temporarily log the exact URL being used for the API call.
+    // Check your PHP error log for this message.
+    error_log('DEBUG: Making API request (' . $method . ') to: ' . $url);
+    if ($data) {
+         error_log('DEBUG: Request Data: ' . json_encode($data));
     }
+    // --- DEBUGGING END ---
 
-    $headers = [
-        'Accept: application/json',
+
+    // Initialize cURL session
+    $ch = curl_init();
+
+    // Default headers for JSON content
+    $default_headers = [
         'Content-Type: application/json',
+        'Accept: application/json'
     ];
 
-    // Add Authorization header if required and token exists
-    if ($sendAuthToken) {
-        $token = get_auth_token(); // From session_manager.php
-        if ($token) {
-            $headers[] = 'Authorization: Bearer ' . $token;
-        } else {
-            // Optionally handle cases where auth is required but token is missing
-             error_log("Warning: Auth token required for {$method} {$endpoint} but not found in session.");
-             // Depending on the endpoint, you might return an error here or let the API handle it
-        }
+    // Merge default headers with any custom headers provided
+    $final_headers = array_merge($default_headers, $headers);
+
+    // Set cURL options
+    curl_setopt($ch, CURLOPT_URL, $url); // Set the request URL
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // Return response as a string instead of outputting it
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method); // Set the HTTP method
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $final_headers); // Set the request headers
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Set a request timeout (30 seconds)
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Set a connection timeout (10 seconds)
+
+    // If data is provided, encode it as JSON and set it as the request body
+    if ($data !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     }
 
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // Return response as string
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method); // Set HTTP method
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Request timeout 30 seconds
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Connection timeout 10 seconds
-    curl_setopt($ch, CURLOPT_FAILONERROR, false); // Get response body even on 4xx/5xx errors
+    // Execute the cURL request
+    $response = curl_exec($ch);
+    // Get the HTTP status code of the response
+    $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    // Check for cURL errors during the request execution
+    $curl_error = curl_error($ch);
 
-    // --- Production HTTPS Settings ---
-    // These should generally be TRUE in production for security.
-    // If you encounter SSL issues, investigate server/certificate config, avoid disabling these.
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-    // Optional: Specify CA bundle path if needed
-    // curl_setopt($ch, CURLOPT_CAINFO, '/path/to/cacert.pem');
-
-    // Add request body for POST/PUT
-    if (($method === 'POST' || $method === 'PUT') && $data !== null) {
-        $jsonData = json_encode($data);
-        if ($jsonData === false) {
-             error_log('Error: Failed to encode JSON data for API request.');
-             curl_close($ch);
-             return ['success' => false, 'status_code' => 0, 'data' => null, 'error_message' => 'Failed to encode request data.'];
-        }
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-    } elseif ($method !== 'GET' && $method !== 'DELETE' && $data !== null) {
-        // Handle other methods if necessary, or log warning
-        error_log("Warning: Data provided for unsupported HTTP method '{$method}' in _make_api_request.");
-    }
-
-
-    $responseBody = curl_exec($ch);
-    $httpStatusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlErrorNo = curl_errno($ch);
-    $curlError = curl_error($ch);
-
+    // Close the cURL session
     curl_close($ch);
 
-    // Handle cURL execution errors (network issues, SSL problems, etc.)
-    if ($curlErrorNo !== CURLE_OK) {
-        error_log("cURL Error ({$curlErrorNo}) for {$method} {$url}: {$curlError}");
-        return ['success' => false, 'status_code' => 0, 'data' => null, 'error_message' => "Network or connection error communicating with API: {$curlError}"];
+    // Handle cURL errors
+    if ($curl_error) {
+        // Log the cURL error
+        error_log("cURL Error for $method $url: " . $curl_error);
+        // Return an error structure indicating a connection failure
+        return ['status' => 503, 'body' => ['error' => 'API connection failed', 'details' => $curl_error]]; // 503 Service Unavailable
     }
 
     // Decode the JSON response body
-    $responseData = null;
-    if ($responseBody) {
-        $responseData = json_decode($responseBody, true); // true for associative array
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("Error decoding JSON response from {$method} {$url}. Status: {$httpStatusCode}. Response: " . substr($responseBody, 0, 500));
-            // Return success based on HTTP code, but indicate data decoding issue
-            return [
-                'success' => ($httpStatusCode >= 200 && $httpStatusCode < 300),
-                'status_code' => $httpStatusCode,
-                'data' => null, // Indicate data is unusable
-                'error_message' => 'Invalid JSON response received from API.'
-            ];
-        }
+    $body = json_decode($response, true);
+
+    // Handle JSON decoding errors
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        // Log the decoding error and the raw response
+        error_log("JSON Decode Error for $method $url: " . json_last_error_msg() . ". Response: " . $response);
+        // Return an error structure indicating an invalid response from the API
+        return ['status' => 502, 'body' => ['error' => 'Invalid API response', 'details' => json_last_error_msg()]]; // 502 Bad Gateway
     }
 
-    // Determine success based on HTTP status code (2xx range)
-    $isSuccess = ($httpStatusCode >= 200 && $httpStatusCode < 300);
-
-    // Extract API's error detail if available and request failed
-    $apiErrorMessage = null;
-    if (!$isSuccess && isset($responseData['detail'])) {
-        // Handle cases where detail might be an array (like validation errors)
-        if (is_array($responseData['detail'])) {
-             // Attempt to format validation errors nicely
-             $errorMessages = [];
-             foreach($responseData['detail'] as $errorItem) {
-                 if (isset($errorItem['msg']) && isset($errorItem['loc'])) {
-                      $location = implode(' -> ', $errorItem['loc']);
-                      $errorMessages[] = "{$location}: {$errorItem['msg']}";
-                 } elseif (is_string($errorItem)) {
-                     $errorMessages[] = $errorItem;
-                 }
-             }
-             $apiErrorMessage = implode('; ', $errorMessages);
-             // Fallback if formatting fails
-             if (empty($apiErrorMessage)) {
-                 $apiErrorMessage = json_encode($responseData['detail']);
-             }
-
-        } elseif (is_string($responseData['detail'])) {
-            $apiErrorMessage = $responseData['detail'];
-        }
-    } elseif (!$isSuccess && $responseBody && empty($responseData)) {
-        // Handle cases where the error response wasn't valid JSON but contained text
-        $apiErrorMessage = "API returned status {$httpStatusCode}. Response: " . substr(strip_tags($responseBody), 0, 200);
-    } elseif (!$isSuccess && empty($apiErrorMessage)) {
-         $apiErrorMessage = "API request failed with status code {$httpStatusCode}.";
-    }
-
-
-    return [
-        'success' => $isSuccess,
-        'status_code' => $httpStatusCode,
-        'data' => $responseData,
-        'error_message' => $apiErrorMessage // Contains API 'detail' or generic message on failure
-    ];
+    // Return the status code and the decoded response body
+    return ['status' => $http_status, 'body' => $body];
 }
 
-// --- Public API Functions ---
+// --- Public API Client Functions ---
+// These functions provide a simpler interface for common API interactions.
 
-/** Register a new user */
-function api_register_user(array $userData): array {
-    // Expects ['email' => ..., 'password' => ..., 'display_name' => (optional), 'phone_number' => (optional)]
-    return _make_api_request('POST', '/auth/register', $userData);
-}
-
-/** Login user */
-function api_login_user(string $email, string $password, bool $rememberMe = false): array {
-    return _make_api_request('POST', '/auth/login', [
+/**
+ * Registers a new user via the API.
+ *
+ * @param string $username The desired username.
+ * @param string $email The user's email address.
+ * @param string $password The user's chosen password.
+ * @return array The API response ('status' and 'body').
+ */
+function api_register_user(string $username, string $email, string $password): array {
+    return _make_api_request('POST', '/users/register', [
+        'username' => $username,
         'email' => $email,
-        'password' => $password,
-        'remember_me' => $rememberMe
+        'password' => $password
     ]);
 }
 
-/** Logout user (requires valid token) */
-function api_logout_user(): array {
-    // The API endpoint might not strictly require data, but needs the auth token
-    return _make_api_request('POST', '/auth/logout', null, true);
+/**
+ * Logs in a user via the API.
+ *
+ * @param string $email The user's email address.
+ * @param string $password The user's password.
+ * @return array The API response ('status' and 'body'). Expected body includes 'token' and 'user' details on success.
+ */
+function api_login_user(string $email, string $password): array {
+    return _make_api_request('POST', '/users/login', [
+        'email' => $email,
+        'password' => $password
+    ]);
 }
 
-/** Refresh access token */
-function api_refresh_token(string $refreshToken): array {
-    return _make_api_request('POST', '/auth/refresh-token', ['refresh_token' => $refreshToken]);
+/**
+ * Verifies a user's email address using a token.
+ *
+ * @param string $token The email verification token.
+ * @return array The API response ('status' and 'body').
+ */
+function api_verify_email(string $token): array {
+    return _make_api_request('GET', '/users/verify-email/' . urlencode($token));
 }
 
-/** Request password reset email */
-function api_request_password_reset(string $email): array {
-    return _make_api_request('POST', '/auth/reset-password/request', ['email' => $email]);
+/**
+ * Requests a password reset email for a user.
+ *
+ * @param string $email The email address of the user requesting the reset.
+ * @return array The API response ('status' and 'body').
+ */
+function api_forgot_password(string $email): array {
+    return _make_api_request('POST', '/users/forgot-password', ['email' => $email]);
 }
 
-/** Confirm password reset using token */
-function api_confirm_password_reset(string $token, string $newPassword): array {
-    // NOTE: Your Python API currently returns a placeholder for this endpoint.
-    // Adjust expected response/logic when backend is implemented.
-    return _make_api_request('POST', '/auth/reset-password/confirm', [
+/**
+ * Resets a user's password using a reset token.
+ *
+ * @param string $token The password reset token.
+ * @param string $new_password The new password chosen by the user.
+ * @return array The API response ('status' and 'body').
+ */
+function api_reset_password(string $token, string $new_password): array {
+    return _make_api_request('POST', '/users/reset-password', [
         'token' => $token,
-        'new_password' => $newPassword
+        'password' => $new_password
     ]);
 }
 
-/** Get current user's profile (requires valid token) */
-function api_get_user_profile(): array {
-    return _make_api_request('GET', '/users/me', null, true);
+/**
+ * Changes the password for an authenticated user.
+ *
+ * @param string $current_password The user's current password.
+ * @param string $new_password The desired new password.
+ * @param string $auth_token The user's authentication token (JWT).
+ * @return array The API response ('status' and 'body').
+ */
+function api_change_password(string $current_password, string $new_password, string $auth_token): array {
+    return _make_api_request('POST', '/users/change-password', [
+        'current_password' => $current_password,
+        'new_password' => $new_password
+    ], ['Authorization: Bearer ' . $auth_token]); // Send auth token in header
 }
 
-/** Update current user's profile (requires valid token) */
-function api_update_user_profile(array $updateData): array {
-    // Expects ['display_name' => (optional), 'phone_number' => (optional)]
-    return _make_api_request('PUT', '/users/me', $updateData, true);
+/**
+ * Fetches the profile data for the authenticated user.
+ *
+ * @param string $auth_token The user's authentication token (JWT).
+ * @return array The API response ('status' and 'body'). Expected body includes user details.
+ */
+function api_get_profile(string $auth_token): array {
+    return _make_api_request('GET', '/users/profile', null, ['Authorization: Bearer ' . $auth_token]);
 }
 
-/** Update current user's password (requires valid token) */
-function api_update_password(string $currentPassword, string $newPassword): array {
-    // NOTE: Your Python API expects 'current_password' but doesn't seem to use it for validation yet.
-    // The dependency uses get_current_verified_user, implying the user is already authenticated.
-    // Sending current_password anyway for potential future use or if backend logic changes.
-    return _make_api_request('PUT', '/users/me/password', [
-        'current_password' => $currentPassword, // May not be used by current backend logic
-        'new_password' => $newPassword
-    ], true);
+/**
+ * Updates the profile data for the authenticated user.
+ *
+ * @param array $profile_data Associative array of data to update (e.g., ['username' => 'new_name']).
+ * @param string $auth_token The user's authentication token (JWT).
+ * @return array The API response ('status' and 'body').
+ */
+function api_update_profile(array $profile_data, string $auth_token): array {
+    return _make_api_request('PUT', '/users/profile', $profile_data, ['Authorization: Bearer ' . $auth_token]);
 }
 
-/** Delete current user's account (requires valid token) */
-function api_delete_account(): array {
-    return _make_api_request('DELETE', '/users/me', null, true);
+/**
+ * Initiates the MFA setup process for the authenticated user.
+ *
+ * @param string $auth_token The user's authentication token (JWT).
+ * @return array The API response ('status' and 'body'). Expected body includes 'secret' and 'qr_code_url'.
+ */
+function api_setup_mfa(string $auth_token): array {
+    return _make_api_request('POST', '/mfa/setup', null, ['Authorization: Bearer ' . $auth_token]);
 }
 
-/** Initiate MFA setup (requires valid token) */
-function api_setup_mfa(): array {
-    return _make_api_request('POST', '/auth/mfa/setup', null, true);
+/**
+ * Verifies and enables MFA for the authenticated user.
+ *
+ * @param string $mfa_code The 6-digit code from the authenticator app.
+ * @param string $auth_token The user's authentication token (JWT).
+ * @return array The API response ('status' and 'body').
+ */
+function api_verify_mfa_setup(string $mfa_code, string $auth_token): array {
+    return _make_api_request('POST', '/mfa/verify', ['mfa_code' => $mfa_code], ['Authorization: Bearer ' . $auth_token]);
 }
 
-/** Verify MFA code (requires valid token) */
-function api_verify_mfa(string $code, string $method = 'totp'): array {
-    // Method can be 'totp' or 'backup'
-    return _make_api_request('POST', '/auth/mfa/verify', [
-        'code' => $code,
-        'method' => $method
-    ], true);
+/**
+ * Verifies an MFA code during login.
+ *
+ * @param int $user_id The ID of the user attempting to log in.
+ * @param string $mfa_code The 6-digit code from the authenticator app.
+ * @return array The API response ('status' and 'body'). Expected body includes 'token' and 'user' on success.
+ */
+function api_verify_mfa_login(int $user_id, string $mfa_code): array {
+    // Note: This endpoint might not require a bearer token initially,
+    // as it's part of the login flow *before* the final token is issued.
+    // Adjust if your API requires a temporary token or different mechanism here.
+    return _make_api_request('POST', '/mfa/login-verify', [
+        'user_id' => $user_id,
+        'mfa_code' => $mfa_code
+    ]);
 }
 
-/** Disable MFA (requires valid token) */
-function api_disable_mfa(): array {
-    return _make_api_request('POST', '/auth/mfa/disable', null, true);
+/**
+ * Disables MFA for the authenticated user.
+ * Requires current password for confirmation.
+ *
+ * @param string $password The user's current password.
+ * @param string $auth_token The user's authentication token (JWT).
+ * @return array The API response ('status' and 'body').
+ */
+function api_disable_mfa(string $password, string $auth_token): array {
+    return _make_api_request('POST', '/mfa/disable', ['password' => $password], ['Authorization: Bearer ' . $auth_token]);
 }
-
-// Add functions for other API endpoints as needed.
 
 ?>
