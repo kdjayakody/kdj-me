@@ -1,4 +1,3 @@
-```php
 <?php
 // Set page specific variables
 $title = "Two-Factor Authentication";
@@ -336,4 +335,3 @@ HTML;
 // Include footer
 include 'footer.php';
 ?>
-```
