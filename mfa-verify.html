@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KDJ Auth - MFA Verification</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- JWT Decode -->
+    <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
+    <style>
+        .bg-pattern {
+            background-color: #f8fafc;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e2e8f0' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+    </style>
+</head>
+<body class="bg-pattern min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full bg-white rounded-lg shadow-lg overflow-hidden" x-data="mfaVerifyForm()">
+        <div class="px-6 py-8">
+            <div class="text-center mb-10">
+                <h1 class="text-3xl font-bold text-gray-800">Two-Factor Authentication</h1>
+                <p class="mt-2 text-gray-600">Enter the verification code to complete your login</p>
+            </div>
+
+            <!-- Alert for errors -->
+            <div x-show="errorMessage" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+                <span class="block sm:inline" x-text="errorMessage"></span>
+            </div>
+
+            <!-- Verification Form -->
+            <form @submit.prevent="verifyMfa" class="space-y-6">
+                <div>
+                    <label for="verification_code" class="block text-sm font-medium text-gray-700">Authentication Code</label>
+                    <input x-model="verificationCode" type="text" id="verification_code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-center text-xl tracking-widest font-mono" maxlength="6" autofocus>
+                    <p class="mt-2 text-sm text-gray-500">
+                        Enter the 6-digit code from your authenticator app
+                    </p>
+                </div>
+
+                <div class="mt-4 flex items-center justify-between">
+                    <div class="text-sm">
+                        <button @click="toggleMethod" type="button" class="font-medium text-indigo-600 hover:text-indigo-500">
+                            <span x-show="method === 'totp'">Use backup code instead</span>
+                            <span x-show="method === 'backup'">Use authenticator app instead</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
+                        :class="{'opacity-75 cursor-not-allowed': isLoading}" 
+                        :disabled="isLoading || !verificationCode">
+                        <span x-show="isLoading" class="mr-2">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                        <span>Verify</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-6 text-center">
+                <p class="text-sm text-gray-600">
+                    <a href="index.html" class="font-medium text-indigo-600 hover:text-indigo-500">
+                        Back to login
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        function mfaVerifyForm() {
+            return {
+                verificationCode: '',
+                method: 'totp', // 'totp' or 'backup'
+                errorMessage: '',
+                isLoading: false,
+                
+                toggleMethod() {
+                    this.method = this.method === 'totp' ? 'backup' : 'totp';
+                    this.verificationCode = '';
+                },
+                
+                // Check if MFA is pending on page load
+                checkPendingMfa() {
+                    const pendingToken = localStorage.getItem('pending_mfa_token');
+                    const pendingUserId = localStorage.getItem('pending_mfa_user_id');
+                    
+                    if (!pendingToken || !pendingUserId) {
+                        // No pending MFA, redirect to login
+                        window.location.href = 'index.html';
+                    }
+                },
+                
+                async verifyMfa() {
+                    if (!this.verificationCode) {
+                        this.errorMessage = 'Please enter the verification code';
+                        return;
+                    }
+                    
+                    this.isLoading = true;
+                    this.errorMessage = '';
+                    
+                    try {
+                        // Verify MFA code
+                        await auth.verifyMfaLogin(this.verificationCode, this.method);
+                        
+                        // Redirect to dashboard on success
+                        window.location.href = 'dashboard.html';
+                    } catch (error) {
+                        console.error('MFA verification error:', error);
+                        this.errorMessage = error.message || 'Invalid verification code. Please try again.';
+                    } finally {
+                        this.isLoading = false;
+                    }
+                }
+            };
+        }
+        
+        // Check for pending MFA on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const controller = Alpine.data('mfaVerifyForm')();
+            controller.checkPendingMfa();
+        });
+    </script>
+</body>
+</html>
