@@ -197,18 +197,33 @@ const api = {
         return this.fetchWithAuth('/auth/mfa/setup', 'POST');
     },
     
-    /**
+   /**
      * Verify MFA code
      * @param {string} code - Verification code
      * @param {string} method - MFA method (totp or backup)
      * @returns {Promise} API response
      */
-    async verifyMfa(code, method = 'totp') {
-        return this.fetchWithAuth('/auth/mfa/verify', 'POST', {
-            code,
+   async verifyMfa(code, method = 'totp') {
+    // Normalize the code - remove spaces and hyphens for backup codes
+    const normalizedCode = method === 'backup' ? code.replace(/[-\s]/g, '') : code;
+    
+    try {
+        return await this.fetchWithAuth('/auth/mfa/verify', 'POST', {
+            code: normalizedCode,
             method
         });
-    },
+    } catch (error) {
+        // Provide more user-friendly error messages
+        if (error.message.includes('Invalid')) {
+            if (method === 'totp') {
+                throw new Error('Invalid verification code. Please check your authenticator app and try again.');
+            } else if (method === 'backup') {
+                throw new Error('Invalid backup code. Please make sure you entered it correctly.');
+            }
+        }
+        throw error;
+    }
+},
     
     /**
      * Disable MFA

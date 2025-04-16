@@ -195,28 +195,58 @@ const auth = {
         return { success: true };
     },
     
-    /**
+     /**
      * Verify MFA during login
      * @param {string} code - The verification code
      * @param {string} method - The MFA method (totp or backup)
      * @returns {Promise} Authentication result
      */
-    async verifyMfaLogin(code, method = 'totp') {
+     async verifyMfaLogin(code, method = 'totp') {
         try {
             // Get the pending MFA token
             const pendingToken = localStorage.getItem('pending_mfa_token');
+            const userId = localStorage.getItem('pending_mfa_user_id');
             
-            if (!pendingToken) {
+            if (!pendingToken || !userId) {
                 throw new Error('No pending MFA verification found');
             }
             
-            // Call API to verify MFA
-            const result = await api.verifyMfa(code, method);
+            // Set auth token temporarily so the API call can be authenticated
+            const tempAuthHeader = {
+                'Authorization': `Bearer ${pendingToken}`
+            };
             
-            // Get complete auth data after MFA verification
-            const userId = localStorage.getItem('pending_mfa_user_id');
+            // Call API to verify MFA with the token in the header
+            // We need to use the raw fetch API here to ensure the token is included
+            const response = await fetch(`${API_BASE_URL}/auth/mfa/verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...tempAuthHeader
+                },
+                body: JSON.stringify({
+                    code: code,
+                    method: method
+                }),
+                credentials: 'include' // Include cookies
+            });
             
-            // Create auth data object
+            // Handle error responses
+            if (!response.ok) {
+                const errorData = await response.json();
+                
+                // Provide specific error messages for backup codes
+                if (method === 'backup' && errorData.detail?.includes('Invalid')) {
+                    throw new Error('Invalid backup code. Please try again or use a different backup code.');
+                }
+                
+                throw new Error(errorData.detail || 'MFA verification failed');
+            }
+            
+            // Parse successful response
+            const result = await response.json();
+            
+            // Create complete auth data object
             const authData = {
                 access_token: pendingToken,
                 token_type: 'bearer',
@@ -234,6 +264,7 @@ const auth = {
             
             return result;
         } catch (error) {
+            console.error('MFA verification error:', error);
             throw error;
         }
     },

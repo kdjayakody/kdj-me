@@ -18,7 +18,7 @@
     </style>
 </head>
 <body class="bg-pattern min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full bg-white rounded-lg shadow-lg overflow-hidden" x-data="mfaVerifyForm()">
+    <div class="max-w-md w-full bg-white rounded-lg shadow-lg overflow-hidden" x-data="mfaVerifyForm()" x-init="initMfaVerification()">
         <div class="px-6 py-8">
             <div class="text-center mb-10">
                 <h1 class="text-3xl font-bold text-gray-800">Two-Factor Authentication</h1>
@@ -33,10 +33,23 @@
             <!-- Verification Form -->
             <form @submit.prevent="verifyMfa" class="space-y-6">
                 <div>
-                    <label for="verification_code" class="block text-sm font-medium text-gray-700">Authentication Code</label>
-                    <input x-model="verificationCode" type="text" id="verification_code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-center text-xl tracking-widest font-mono" maxlength="6" autofocus>
-                    <p class="mt-2 text-sm text-gray-500">
+                    <label for="verification_code" class="block text-sm font-medium text-gray-700">
+                        <span x-show="method === 'totp'">Authentication Code</span>
+                        <span x-show="method === 'backup'">Backup Code</span>
+                    </label>
+                    <input x-model="verificationCode" type="text" id="verification_code" 
+                        autocomplete="one-time-code" 
+                        :inputmode="method === 'totp' ? 'numeric' : 'text'"
+                        :pattern="method === 'totp' ? '[0-9]*' : null"
+                        required 
+                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-center text-xl tracking-widest font-mono" 
+                        :maxlength="method === 'totp' ? '6' : '12'"
+                        autofocus>
+                    <p class="mt-2 text-sm text-gray-500" x-show="method === 'totp'">
                         Enter the 6-digit code from your authenticator app
+                    </p>
+                    <p class="mt-2 text-sm text-gray-500" x-show="method === 'backup'">
+                        Enter one of your backup codes (format: XXXX-XXXX-XX)
                     </p>
                 </div>
 
@@ -85,9 +98,23 @@
                 errorMessage: '',
                 isLoading: false,
                 
+                initMfaVerification() {
+                    // Check if MFA is pending and initialize the component
+                    this.checkPendingMfa();
+                    
+                    // Clear any misleading error messages that might be stored in sessionStorage
+                    sessionStorage.removeItem('auth_error');
+                },
+                
                 toggleMethod() {
                     this.method = this.method === 'totp' ? 'backup' : 'totp';
                     this.verificationCode = '';
+                    this.errorMessage = '';
+                    
+                    // Focus input field after toggling
+                    setTimeout(() => {
+                        document.getElementById('verification_code').focus();
+                    }, 100);
                 },
                 
                 // Check if MFA is pending on page load
@@ -97,7 +124,27 @@
                     
                     if (!pendingToken || !pendingUserId) {
                         // No pending MFA, redirect to login
-                        window.location.href = 'index.html';
+                        window.location.href = 'index.html?message=session_expired&type=error';
+                    }
+                },
+                
+                formatBackupCode() {
+                    // Only apply formatting to backup codes
+                    if (this.method !== 'backup') return;
+                    
+                    // Remove existing hyphens and spaces
+                    let code = this.verificationCode.replace(/[-\s]/g, '');
+                    
+                    // Only proceed if we have characters to format
+                    if (code.length > 0) {
+                        // Format as XXXX-XXXX-XX
+                        if (code.length <= 4) {
+                            this.verificationCode = code;
+                        } else if (code.length <= 8) {
+                            this.verificationCode = code.substring(0, 4) + '-' + code.substring(4);
+                        } else {
+                            this.verificationCode = code.substring(0, 4) + '-' + code.substring(4, 8) + '-' + code.substring(8, 10);
+                        }
                     }
                 },
                 
@@ -107,12 +154,23 @@
                         return;
                     }
                     
+                    // For backup code, handle formatting
+                    if (this.method === 'backup') {
+                        // Ensure the code is formatted correctly (in case user typed without hyphens)
+                        this.formatBackupCode();
+                    }
+                    
                     this.isLoading = true;
                     this.errorMessage = '';
                     
                     try {
-                        // Verify MFA code
-                        await auth.verifyMfaLogin(this.verificationCode, this.method);
+                        // Make a direct call to API for verification instead of going through auth module
+                        const formattedCode = this.method === 'backup' 
+                            ? this.verificationCode.replace(/-/g, '') // Remove hyphens for sending to API
+                            : this.verificationCode;
+                            
+                        // Directly verify the MFA code
+                        await auth.verifyMfaLogin(formattedCode, this.method);
                         
                         // Redirect to dashboard on success
                         window.location.href = 'dashboard.html';
@@ -125,12 +183,6 @@
                 }
             };
         }
-        
-        // Check for pending MFA on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            const controller = Alpine.data('mfaVerifyForm')();
-            controller.checkPendingMfa();
-        });
     </script>
 </body>
 </html>

@@ -103,6 +103,9 @@
                             localStorage.setItem('pending_mfa_token', result.access_token);
                             localStorage.setItem('pending_mfa_user_id', result.user_id);
                             
+                            // Clear any previous auth errors
+                            sessionStorage.removeItem('auth_error');
+                            
                             // Redirect to MFA verification page
                             window.location.href = 'mfa-verify.html';
                         } else {
