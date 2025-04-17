@@ -34,7 +34,7 @@ include 'header.php';
             </p>
         </div>
         
-        <form id="loginForm" class="mt-8 space-y-6" onsubmit="return false;">
+        <form id="loginForm" class="mt-8 space-y-6" method="post" onsubmit="event.preventDefault();">
             <input type="hidden" name="remember" value="true">
             <div class="rounded-md shadow-sm -space-y-px">
                 <div>
@@ -183,7 +183,7 @@ $additional_scripts = <<<HTML
         showLoading();
         
         try {
-            const response = await fetch(apiBaseUrl + '/auth/login', {
+            const response = await fetch(`${apiBaseUrl}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
