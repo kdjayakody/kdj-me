@@ -17,7 +17,14 @@ const REDIRECT_AFTER_LOGIN = 'dashboard.php';
  */
 function showToast(message, type = 'success', duration = 5000) {
     const toastContainer = document.getElementById('toastContainer');
-    if (!toastContainer) return;
+    if (!toastContainer) {
+        // Create toast container if it doesn't exist
+        const container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'fixed top-4 right-4 z-50';
+        document.body.appendChild(container);
+        toastContainer = container;
+    }
     
     const toast = document.createElement('div');
     toast.className = `mb-3 p-4 rounded-lg shadow-lg text-white ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'} transform transition-all duration-300 translate-x-full`;
@@ -51,10 +58,32 @@ function showToast(message, type = 'success', duration = 5000) {
  * Show loading indicator
  */
 function showLoading() {
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    if (loadingIndicator) {
-        loadingIndicator.style.display = 'flex';
+    let loadingIndicator = document.getElementById('loadingIndicator');
+    
+    // Create loading indicator if it doesn't exist
+    if (!loadingIndicator) {
+        loadingIndicator = document.createElement('div');
+        loadingIndicator.id = 'loadingIndicator';
+        loadingIndicator.className = 'fixed top-0 left-0 w-full h-full flex items-center justify-center bg-white bg-opacity-80 z-50';
+        loadingIndicator.innerHTML = '<div class="loader h-16 w-16 border-4 border-gray-200 rounded-full" style="border-top-color: #cb2127; animation: spin 1s linear infinite;"></div>';
+        
+        // Add keyframe animation if not already defined
+        if (!document.getElementById('loaderAnimationStyle')) {
+            const style = document.createElement('style');
+            style.id = 'loaderAnimationStyle';
+            style.textContent = `
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(loadingIndicator);
     }
+    
+    loadingIndicator.style.display = 'flex';
 }
 
 /**
@@ -130,6 +159,8 @@ function formatDate(dateString, includeTime = true) {
     if (!dateString) return 'Never';
     
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
     const options = {
         year: 'numeric',
         month: 'long',
@@ -173,38 +204,166 @@ function getTimeBasedGreeting() {
  * @returns {Promise} - Promise that resolves to the API response
  */
 async function apiRequest(endpoint, options = {}, includeCredentials = true) {
-    const defaultHeaders = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    };
-
-    const config = {
-        ...options,
-        headers: {
-            ...defaultHeaders,
-            ...(options.headers || {}),
-        }
-    };
-    
-    if (includeCredentials) {
-        config.credentials = 'include';
-    }
-    
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+        const defaultHeaders = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        };
         
-        // Handle unauthorized error by redirecting to login
-        if (response.status === 401) {
-            // Save current URL to redirect back after login
-            sessionStorage.setItem('redirectAfterLogin', window.location.href);
-            window.location.href = 'index.php';
-            throw new Error('Unauthorized');
+        // Add auth token to headers if available
+        const authToken = sessionStorage.getItem('auth_token');
+        if (authToken) {
+            defaultHeaders['Authorization'] = `Bearer ${authToken}`;
+        }
+        
+        const config = {
+            ...options,
+            headers: {
+                ...defaultHeaders,
+                ...(options.headers || {}),
+            }
+        };
+        
+        if (includeCredentials) {
+            config.credentials = 'include';
+        }
+        
+        // Check if token needs refresh before making request
+        if (isTokenExpiringSoon() && endpoint !== '/auth/refresh-token') {
+            await refreshAuthToken();
+            
+            // Update authorization header with new token
+            const newToken = sessionStorage.getItem('auth_token');
+            if (newToken) {
+                config.headers['Authorization'] = `Bearer ${newToken}`;
+            }
+        }
+        
+        // Add request timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        config.signal = controller.signal;
+        
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+        clearTimeout(timeoutId); // Clear timeout on successful response
+        
+        // Handle unauthorized error by trying to refresh token once
+        if (response.status === 401 && endpoint !== '/auth/refresh-token' && endpoint !== '/auth/login') {
+            // Try to refresh the token
+            const refreshed = await refreshAuthToken();
+            
+            if (refreshed) {
+                // Retry the original request with new token
+                const newToken = sessionStorage.getItem('auth_token');
+                if (newToken) {
+                    config.headers['Authorization'] = `Bearer ${newToken}`;
+                }
+                
+                // Create new abort controller for retry
+                const retryController = new AbortController();
+                const retryTimeoutId = setTimeout(() => retryController.abort(), 30000);
+                config.signal = retryController.signal;
+                
+                const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, config);
+                clearTimeout(retryTimeoutId);
+                
+                if (retryResponse.status === 401) {
+                    // Still unauthorized after token refresh, redirect to login
+                    sessionStorage.removeItem('auth_token');
+                    sessionStorage.removeItem('token_expiry');
+                    sessionStorage.removeItem('refresh_token');
+                    
+                    // Save current URL to redirect back after login
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                    window.location.href = '/index.php';
+                    throw new Error('Session expired. Please log in again.');
+                }
+                
+                return retryResponse;
+            } else {
+                // Token refresh failed, redirect to login
+                sessionStorage.removeItem('auth_token');
+                sessionStorage.removeItem('token_expiry');
+                sessionStorage.removeItem('refresh_token');
+                
+                // Save current URL to redirect back after login
+                sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                window.location.href = '/index.php';
+                throw new Error('Session expired. Please log in again.');
+            }
         }
         
         return response;
     } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Request timeout. Please check your internet connection and try again.');
+        }
+        
         console.error(`API call to ${endpoint} failed:`, error);
         throw error;
+    }
+}
+
+/**
+ * Check if token expiration time is coming up
+ * @returns {boolean} True if token is expiring soon
+ */
+function isTokenExpiringSoon() {
+    const tokenExpiry = sessionStorage.getItem('token_expiry');
+    if (!tokenExpiry) return true;
+    
+    // Check if token expires in the next 5 minutes (300000 ms)
+    return parseInt(tokenExpiry) - 300000 < Date.now();
+}
+
+/**
+ * Refresh the auth token using the refresh token
+ * @returns {Promise<boolean>} True if refresh was successful
+ */
+async function refreshAuthToken() {
+    const refreshToken = sessionStorage.getItem('refresh_token');
+    if (!refreshToken) return false;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            console.error('Failed to refresh token:', response.status);
+            return false;
+        }
+        
+        const data = await response.json();
+        
+        if (data.access_token) {
+            // Store the new token
+            sessionStorage.setItem('auth_token', data.access_token);
+            
+            // Update expiry time
+            if (data.expires_in) {
+                const expiryTime = Date.now() + (data.expires_in * 1000);
+                sessionStorage.setItem('token_expiry', expiryTime.toString());
+            }
+            
+            // Store refresh token if provided
+            if (data.refresh_token) {
+                sessionStorage.setItem('refresh_token', data.refresh_token);
+            }
+            
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('Token refresh error:', error);
+        return false;
     }
 }
 
@@ -215,6 +374,8 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
  * @returns {string} - The sanitized HTML string
  */
 function sanitizeHTML(input) {
+    if (!input) return '';
+    
     const div = document.createElement('div');
     div.textContent = input;
     return div.innerHTML;
@@ -272,6 +433,8 @@ async function checkUserAuthentication() {
 async function requireAuthentication() {
     const userData = await checkUserAuthentication();
     if (!userData) {
+        // Save current URL to redirect back after login
+        sessionStorage.setItem('redirectAfterLogin', window.location.href);
         window.location.href = 'index.php';
     }
     return userData;
@@ -288,20 +451,42 @@ async function handleLogout() {
             method: 'POST'
         });
         
+        // Clear session storage regardless of response
+        sessionStorage.removeItem('auth_token');
+        sessionStorage.removeItem('token_expiry');
+        sessionStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_id');
+        
         if (response.ok) {
-            // Clear session storage
-            sessionStorage.clear();
-            
             // Redirect to login page
             window.location.href = 'index.php';
         } else {
             const data = await response.json().catch(() => ({ detail: 'Logout failed.' }));
             showToast(`Logout failed: ${data.detail || response.statusText}`, 'error');
+            
+            // Still redirect to login page
+            setTimeout(() => {
+                window.location.href = 'index.php';
+            }, 2000);
+            
             hideLoading();
         }
     } catch (error) {
         console.error('Logout error:', error);
-        showToast('Network error. Please try again.', 'error');
+        
+        // Clear session storage anyway
+        sessionStorage.removeItem('auth_token');
+        sessionStorage.removeItem('token_expiry');
+        sessionStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_id');
+        
+        showToast('Network error during logout. You have been logged out locally.', 'warning');
+        
+        // Redirect to login page
+        setTimeout(() => {
+            window.location.href = 'index.php';
+        }, 2000);
+        
         hideLoading();
     }
 }
@@ -335,10 +520,30 @@ function updateSecurityScore(userData, scoreBar, scoreText, scoreMessage) {
     }
 }
 
+// Set up automatic token refresh check every 5 minutes
+setInterval(async () => {
+    if (isTokenExpiringSoon()) {
+        await refreshAuthToken();
+    }
+}, 300000); // 5 minutes
+
 // Initialize common functionality
 document.addEventListener('DOMContentLoaded', function() {
     // Set up CSRF token if not already set
     if (!sessionStorage.getItem('csrf_token')) {
         sessionStorage.setItem('csrf_token', generateCSRFToken());
+    }
+    
+    // Redirect to appropriate page after login if specified
+    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+    if (redirectAfterLogin && window.location.pathname.includes('index.php')) {
+        // Check if already logged in
+        checkUserAuthentication().then(userData => {
+            if (userData) {
+                // User is logged in, redirect to the saved URL
+                sessionStorage.removeItem('redirectAfterLogin');
+                window.location.href = redirectAfterLogin;
+            }
+        });
     }
 });
