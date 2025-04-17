@@ -4,7 +4,7 @@ $title = "Dashboard";
 $description = "KDJ Lanka User Dashboard";
 $lang = "si";
 
-// Add page specific styles
+// Add page specific scripts/styles
 $additional_head = <<<HTML
 <style>
     /* Sidebar styles */
@@ -23,8 +23,7 @@ $additional_head = <<<HTML
     }
     .dashboard-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-                    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
     
     /* Active sidebar link */
@@ -334,136 +333,257 @@ include 'header.php';
 // Page specific scripts
 $additional_scripts = <<<HTML
 <script>
+    // Configuration
     const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
-
+    
+    // User profile data
+    let userData = null;
+    
+    // Set greeting based on time of day
     function setGreeting() {
         const hour = new Date().getHours();
         let greeting = '';
-        if (hour < 12) greeting = 'සුභ උදෑසනක්';
-        else if (hour < 17) greeting = 'සුභ දහවලක්';
-        else greeting = 'සුභ සන්ධ්‍යාවක්';
+        
+        if (hour < 12) {
+            greeting = 'සුභ උදෑසනක්';
+        } else if (hour < 17) {
+            greeting = 'සුභ දහවලක්';
+        } else {
+            greeting = 'සුභ සන්ධ්‍යාවක්';
+        }
+        
         document.getElementById('sidebarGreeting').textContent = greeting;
         document.getElementById('mobileSidebarGreeting').textContent = greeting;
     }
-
+    
+    // Check if token expiration time is coming up
     function isTokenExpiringSoon() {
-        const expiry = sessionStorage.getItem('token_expiry');
-        if (!expiry) return true;
-        return parseInt(expiry) - Date.now() < 300000;
+        const tokenExpiry = sessionStorage.getItem('token_expiry');
+        if (!tokenExpiry) return true;
+        
+        // Check if token expires in the next 5 minutes (300000 ms)
+        return parseInt(tokenExpiry) - 300000 < Date.now();
     }
-
+    
+    // Refresh auth token
     async function refreshAuthToken() {
         const refreshToken = sessionStorage.getItem('refresh_token');
         if (!refreshToken) return false;
+        
         try {
-            const res = await fetch(\`\${apiBaseUrl}/auth/refresh-token\`, {
+            const response = await fetch(`${apiBaseUrl}/auth/refresh-token`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
-                credentials: 'include',
-                body: JSON.stringify({ refresh_token: refreshToken })
+                body: JSON.stringify({ refresh_token: refreshToken }),
+                credentials: 'include'
             });
-            if (!res.ok) return false;
-            const data = await res.json();
+            
+            if (!response.ok) {
+                console.error('Failed to refresh token:', response.status);
+                return false;
+            }
+            
+            const data = await response.json();
+            
             if (data.access_token) {
+                // Store the new token
                 sessionStorage.setItem('auth_token', data.access_token);
+                
+                // Update expiry time
                 if (data.expires_in) {
-                    sessionStorage.setItem(
-                        'token_expiry',
-                        Date.now() + data.expires_in * 1000
-                    );
+                    const expiryTime = Date.now() + (data.expires_in * 1000);
+                    sessionStorage.setItem('token_expiry', expiryTime.toString());
                 }
+                
+                // Store refresh token if provided
                 if (data.refresh_token) {
                     sessionStorage.setItem('refresh_token', data.refresh_token);
                 }
+                
                 return true;
             }
+            
             return false;
-        } catch (err) {
-            console.error('Token refresh error:', err);
+        } catch (error) {
+            console.error('Token refresh error:', error);
             return false;
         }
     }
-
+    
+    // Load user profile data with token refresh
     async function loadUserProfile() {
         try {
+            // Check if token needs refresh
             if (isTokenExpiringSoon()) {
-                const ok = await refreshAuthToken();
-                if (!ok && !location.pathname.includes('index.php')) {
-                    return location.href = '/index.php';
+                const refreshed = await refreshAuthToken();
+                if (!refreshed) {
+                    // If refresh failed and we're not on login page, redirect
+                    if (!window.location.pathname.includes('index.php')) {
+                        console.log("Token refresh failed, redirecting to login");
+                        window.location.href = '/index.php';
+                        return;
+                    }
                 }
             }
+            
             showLoading();
-            const token = sessionStorage.getItem('auth_token');
-            const headers = { 'Accept': 'application/json' };
-            if (token) headers['Authorization'] = \`Bearer \${token}\`;
-
-            const res = await fetch(\`\${apiBaseUrl}/users/me\`, {
+            
+            // Get auth token from session storage
+            const authToken = sessionStorage.getItem('auth_token');
+            
+            // Prepare headers with token if available
+            const headers = {
+                'Accept': 'application/json'
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            const response = await fetch(`${apiBaseUrl}/users/me`, {
                 method: 'GET',
                 credentials: 'include',
-                headers
+                headers: headers
             });
-            if (!res.ok) {
-                if (res.status === 401) {
-                    sessionStorage.clear();
-                    return location.href = '/index.php';
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    // Clear session storage if unauthorized
+                    sessionStorage.removeItem('auth_token');
+                    sessionStorage.removeItem('token_expiry');
+                    
+                    // Redirect to login
+                    window.location.href = '/index.php';
+                    return;
                 }
+                
                 throw new Error('Failed to fetch profile');
             }
-            const user = await res.json();
-            document.getElementById('sidebarUserName').textContent = user.display_name || user.email;
-            document.getElementById('mobileSidebarUserName').textContent = user.display_name || user.email;
-            updateProfileDisplay(user);
+            
+            userData = await response.json();
+            
+            // Update sidebar with user name
+            document.getElementById('sidebarUserName').textContent = userData.display_name || userData.email;
+            document.getElementById('mobileSidebarUserName').textContent = userData.display_name || userData.email;
+            
+            // Update profile display
+            updateProfileDisplay(userData);
+            
             hideLoading();
-        } catch (err) {
+        } catch (error) {
             hideLoading();
-            console.error(err);
-            showToast('Failed to load profile. Please refresh.', 'error');
-            if (/auth/i.test(err.message)) location.href = '/index.php';
+            console.error('Failed to load user profile:', error);
+            showToast('Failed to load profile data. Please try refreshing the page.', 'error');
+            
+            // If there's an auth error, redirect to login
+            if (error.message.includes('authentication') || error.message.includes('auth')) {
+                window.location.href = '/index.php';
+            }
         }
     }
-
+    
+    // Update profile display with user data
     function updateProfileDisplay(user) {
-        document.getElementById('profileName').textContent = user.display_name || 'No name set';
-        document.getElementById('profileEmail').textContent = user.email;
-        document.getElementById('profilePhone').textContent = user.phone_number || 'Not set';
-        document.getElementById('profileMFA').textContent = user.mfa_enabled ? 'MFA: Enabled' : 'MFA: Disabled';
-        const badge = document.getElementById('emailVerificationBadge');
-        badge.classList.toggle('hidden', user.email_verified);
+        // Update header nav
+        const userDisplayName = document.getElementById('userDisplayName');
+        if (userDisplayName) {
+            userDisplayName.textContent = user.display_name || user.email;
+        }
+        
+        // Update profile summary elements
+        const profileName = document.getElementById('profileName');
+        const profileEmail = document.getElementById('profileEmail');
+        const profilePhone = document.getElementById('profilePhone');
+        const profileMFA = document.getElementById('profileMFA');
+        
+        if (profileName) profileName.textContent = user.display_name || 'No name set';
+        if (profileEmail) profileEmail.textContent = user.email;
+        
+        if (profilePhone) {
+            if (user.phone_number) {
+                profilePhone.textContent = user.phone_number;
+            } else {
+                profilePhone.textContent = 'Not set';
+            }
+        }
+        
+        if (profileMFA) {
+            profileMFA.textContent = user.mfa_enabled ? 'MFA: Enabled' : 'MFA: Disabled';
+        }
+        
+        // Email verification badge
+        const emailVerificationBadge = document.getElementById('emailVerificationBadge');
+        if (emailVerificationBadge) {
+            if (!user.email_verified) {
+                emailVerificationBadge.classList.remove('hidden');
+            } else {
+                emailVerificationBadge.classList.add('hidden');
+            }
+        }
     }
-
-    function handleLogout() {
-        sessionStorage.clear();
-        location.href = '/index.php';
-    }
-    document.getElementById('sidebarLogoutBtn')?.addEventListener('click', handleLogout);
-    document.getElementById('mobileSidebarLogoutBtn')?.addEventListener('click', handleLogout);
-
-    // Mobile sidebar toggles remain as before…
-    document.getElementById('mobileSidebarToggle')?.addEventListener('click', () => {
-        document.getElementById('mobileSidebar').classList.remove('hidden');
+    
+    // Mobile sidebar toggle
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
+    const closeMobileSidebar = document.getElementById('closeMobileSidebar');
+    
+    mobileSidebarToggle.addEventListener('click', function() {
+        mobileSidebar.classList.remove('hidden');
         setTimeout(() => {
-            document.getElementById('mobileSidebarContent').classList.remove('-translate-x-full');
+            mobileSidebarContent.classList.remove('-translate-x-full');
         }, 10);
     });
-    document.getElementById('closeMobileSidebar')?.addEventListener('click', () => {
-        document.getElementById('mobileSidebarContent').classList.add('-translate-x-full');
+    
+    function closeSidebar() {
+        mobileSidebarContent.classList.add('-translate-x-full');
         setTimeout(() => {
-            document.getElementById('mobileSidebar').classList.add('hidden');
+            mobileSidebar.classList.add('hidden');
         }, 300);
+    }
+    
+    closeMobileSidebar.addEventListener('click', closeSidebar);
+    
+    mobileSidebar.addEventListener('click', function(e) {
+        if (e.target === mobileSidebar) {
+            closeSidebar();
+        }
     });
-
-    document.addEventListener('DOMContentLoaded', () => {
+    
+    // Sidebar logout
+    const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
+    const mobileSidebarLogoutBtn = document.getElementById('mobileSidebarLogoutBtn');
+    
+    function handleSidebarLogout() {
+        handleLogout();
+    }
+    
+    if (sidebarLogoutBtn) {
+        sidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
+    }
+    
+    if (mobileSidebarLogoutBtn) {
+        mobileSidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
         setGreeting();
         loadUserProfile();
-        setInterval(() => {
-            if (isTokenExpiringSoon()) refreshAuthToken();
-        }, 300000);
+        
+        // Set up a periodic token refresh check every 5 minutes
+        setInterval(async () => {
+            if (isTokenExpiringSoon()) {
+                await refreshAuthToken();
+            }
+        }, 300000); // 5 minutes
     });
 </script>
 HTML;
 
 // Include footer
 include 'footer.php';
+?>
