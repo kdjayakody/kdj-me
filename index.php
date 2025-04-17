@@ -34,7 +34,7 @@ include 'header.php';
             </p>
         </div>
         
-        <form id="loginForm" class="mt-8 space-y-6">
+        <form id="loginForm" class="mt-8 space-y-6" onsubmit="return false;">
             <input type="hidden" name="remember" value="true">
             <div class="rounded-md shadow-sm -space-y-px">
                 <div>
