@@ -1,223 +1,589 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - KDJ Auth</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-        }
-        .navbar {
-            background-color: #333;
-            color: white;
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .navbar h1 {
-            margin: 0;
-            font-size: 1.5em;
-        }
-        .navbar button {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-        .navbar button:hover {
-            background-color: #c82333;
-        }
-        .container {
-            max-width: 900px;
-            margin: 30px auto;
-            padding: 25px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        .welcome-message {
-            font-size: 1.2em;
-            margin-bottom: 20px;
-            color: #333;
-        }
-        .user-details {
-            border-top: 1px solid #eee;
-            padding-top: 20px;
-        }
-        .user-details h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            color: #555;
-        }
-        .user-details p {
-            margin: 8px 0;
-            color: #666;
-        }
-        .user-details strong {
-            color: #333;
-            min-width: 120px;
-            display: inline-block;
-        }
-        .loading, .error-message {
-            text-align: center;
-            padding: 20px;
-            font-size: 1.1em;
-            color: #666;
-        }
-         .error-message {
-            color: #721c24;
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            border-radius: 4px;
-        }
-    </style>
-</head>
-<body>
+<?php
+// Set page specific variables
+$title = "Dashboard";
+$description = "KDJ Lanka User Dashboard";
+$lang = "si";
 
-<div class="navbar">
-    <h1>My Dashboard</h1>
-    <button id="logoutButton">Logout</button>
-</div>
+// Add page specific scripts/styles
+$additional_head = <<<HTML
+<style>
+    /* Sidebar styles */
+    @media (min-width: 768px) {
+        .sidebar {
+            width: 250px;
+        }
+        .content {
+            margin-left: 250px;
+        }
+    }
+    
+    /* Dashboard card styles */
+    .dashboard-card {
+        transition: all 0.3s ease;
+    }
+    .dashboard-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Active sidebar link */
+    .sidebar-link.active {
+        background-color: rgba(203, 33, 39, 0.1);
+        color: #cb2127;
+        border-left: 3px solid #cb2127;
+    }
+</style>
+HTML;
 
-<div class="container">
-    <div id="loadingMessage" class="loading">Loading dashboard...</div>
-    <div id="errorMessage" class="error-message" style="display: none;"></div>
+// Include header
+include 'header.php';
+?>
 
-    <div id="dashboardContent" style="display: none;">
-        <div class="welcome-message">
-            Welcome back, <strong id="displayName">User</strong>!
+<div class="flex min-h-screen bg-gray-100">
+    <!-- Sidebar -->
+    <aside class="sidebar bg-white shadow-md fixed h-full left-0 top-16 hidden md:block overflow-y-auto">
+        <div class="py-4 px-3">
+            <div class="mb-6 px-4">
+                <div class="p-2 bg-kdj-red bg-opacity-10 rounded-lg">
+                    <h2 class="text-lg font-semibold text-kdj-dark">
+                        <span id="sidebarGreeting">සුභ දවසක්</span>
+                    </h2>
+                    <p class="text-sm text-gray-600" id="sidebarUserName">පරිශීලක</p>
+                </div>
+            </div>
+            
+            <ul class="space-y-2 mt-4">
+                <li>
+                    <a href="dashboard.php" class="sidebar-link active flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-tachometer-alt w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="profile.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-user w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>Profile</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="settings.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-cog w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="security.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-shield-alt w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>Security</span>
+                    </a>
+                </li>
+                
+                <li class="border-t border-gray-200 my-4 pt-4">
+                    <h3 class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Applications
+                    </h3>
+                </li>
+                
+                <li>
+                    <a href="https://singlish.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-language w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>KDJ Singlish</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://events.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <i class="fas fa-calendar-alt w-5 h-5 mr-3 text-gray-500"></i>
+                        <span>KDJ Events</span>
+                    </a>
+                </li>
+                
+                <li class="border-t border-gray-200 my-4 pt-2">
+                    <button id="sidebarLogoutBtn" class="w-full flex items-center px-4 py-3 text-kdj-red hover:bg-red-50 rounded-md">
+                        <i class="fas fa-sign-out-alt w-5 h-5 mr-3"></i>
+                        <span>Logout</span>
+                    </button>
+                </li>
+            </ul>
         </div>
-        <div class="user-details">
-            <h3>Your Profile</h3>
-            <p><strong>User ID:</strong> <span id="userId"></span></p>
-            <p><strong>Email:</strong> <span id="userEmail"></span></p>
-            <p><strong>Phone Number:</strong> <span id="userPhone"></span></p>
-            <p><strong>MFA Enabled:</strong> <span id="userMfa"></span></p>
-            <p><strong>Roles:</strong> <span id="userRoles"></span></p>
+    </aside>
+
+    <!-- Mobile sidebar toggle -->
+    <div class="md:hidden fixed bottom-4 right-4 z-10">
+        <button id="mobileSidebarToggle" class="bg-kdj-red text-white rounded-full p-3 shadow-lg">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <!-- Mobile sidebar -->
+    <div id="mobileSidebar" class="md:hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-20 hidden">
+        <div class="bg-white w-64 h-full overflow-y-auto transform transition-transform -translate-x-full" id="mobileSidebarContent">
+            <div class="flex justify-between items-center p-4 border-b">
+                <div class="flex items-center">
+                    <span class="font-bold text-xl text-kdj-dark">KDJ</span>
+                    <span class="font-bold text-xl text-kdj-red">Lanka</span>
+                </div>
+                <button id="closeMobileSidebar" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="py-4 px-3">
+                <div class="mb-6 px-4">
+                    <div class="p-2 bg-kdj-red bg-opacity-10 rounded-lg">
+                        <h2 class="text-lg font-semibold text-kdj-dark">
+                            <span id="mobileSidebarGreeting">සුභ දවසක්</span>
+                        </h2>
+                        <p class="text-sm text-gray-600" id="mobileSidebarUserName">පරිශීලක</p>
+                    </div>
+                </div>
+                
+                <ul class="space-y-2 mt-4">
+                    <li>
+                        <a href="dashboard.php" class="sidebar-link active flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-tachometer-alt w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="profile.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-user w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>Profile</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="settings.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-cog w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="security.php" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-shield-alt w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>Security</span>
+                        </a>
+                    </li>
+                    
+                    <li class="border-t border-gray-200 my-4 pt-4">
+                        <h3 class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Applications
+                        </h3>
+                    </li>
+                    
+                    <li>
+                        <a href="https://singlish.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-language w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>KDJ Singlish</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://events.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                            <i class="fas fa-calendar-alt w-5 h-5 mr-3 text-gray-500"></i>
+                            <span>KDJ Events</span>
+                        </a>
+                    </li>
+                    
+                    <li class="border-t border-gray-200 my-4 pt-2">
+                        <button id="mobileSidebarLogoutBtn" class="w-full flex items-center px-4 py-3 text-kdj-red hover:bg-red-50 rounded-md">
+                            <i class="fas fa-sign-out-alt w-5 h-5 mr-3"></i>
+                            <span>Logout</span>
+                        </button>
+                    </li>
+                </ul>
             </div>
         </div>
+    </div>
+
+    <!-- Main content -->
+    <main class="content flex-1 p-6 md:p-8 pt-24 md:pt-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold text-kdj-dark mb-1">Dashboard</h1>
+                    <p class="text-gray-600">Welcome to your KDJ Lanka account dashboard</p>
+                </div>
+                
+                <div class="mt-4 md:mt-0 flex items-center">
+                    <span class="bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full flex items-center">
+                        <span class="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
+                        Active Account
+                    </span>
+                    <span id="emailVerificationBadge" class="hidden bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        Email Not Verified
+                    </span>
+                </div>
+            </div>
+            
+            <!-- User Profile Summary -->
+            <div class="bg-white shadow rounded-lg p-6 mb-8">
+                <div class="flex flex-col md:flex-row items-center">
+                    <div class="mb-4 md:mb-0 md:mr-6">
+                        <div class="bg-kdj-red rounded-full p-4 text-white">
+                            <i class="fas fa-user text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-semibold mb-2" id="profileName">Loading...</h2>
+                        <div class="flex flex-col md:flex-row md:space-x-6 text-gray-600">
+                            <div class="flex items-center mb-2 md:mb-0">
+                                <i class="fas fa-envelope mr-2 text-gray-400"></i>
+                                <span id="profileEmail">Loading...</span>
+                            </div>
+                            <div class="flex items-center mb-2 md:mb-0" id="profilePhoneContainer">
+                                <i class="fas fa-phone mr-2 text-gray-400"></i>
+                                <span id="profilePhone">Not set</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
+                                <span id="profileMFA">MFA: Disabled</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 md:mt-0">
+                        <a href="profile.php" class="text-kdj-red hover:text-red-800 flex items-center">
+                            Edit Profile
+                            <i class="fas fa-chevron-right ml-2"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <h2 class="text-xl font-semibold mb-4 text-kdj-dark">Quick Actions</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">Account Security</h3>
+                        <div class="p-2 bg-blue-100 rounded-md">
+                            <i class="fas fa-shield-alt text-blue-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Protect your account with additional security features.</p>
+                    <a href="security.php" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                        Configure Security
+                        <i class="fas fa-chevron-right ml-2"></i>
+                    </a>
+                </div>
+                
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">Update Profile</h3>
+                        <div class="p-2 bg-green-100 rounded-md">
+                            <i class="fas fa-user-edit text-green-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Keep your profile information up to date.</p>
+                    <a href="profile.php" class="text-green-600 hover:text-green-800 text-sm font-medium flex items-center">
+                        Edit Profile
+                        <i class="fas fa-chevron-right ml-2"></i>
+                    </a>
+                </div>
+                
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">Change Password</h3>
+                        <div class="p-2 bg-purple-100 rounded-md">
+                            <i class="fas fa-key text-purple-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Update your password regularly for better security.</p>
+                    <a href="settings.php" class="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center">
+                        Change Password
+                        <i class="fas fa-chevron-right ml-2"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- KDJ Services -->
+            <h2 class="text-xl font-semibold mb-4 text-kdj-dark">KDJ Services</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">KDJ Singlish</h3>
+                        <div class="p-2 bg-yellow-100 rounded-md">
+                            <i class="fas fa-language text-yellow-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Sinhala-English translation and language tools.</p>
+                    <a href="https://singlish.kdj.lk" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium flex items-center">
+                        Access Singlish
+                        <i class="fas fa-external-link-alt ml-2"></i>
+                    </a>
+                </div>
+                
+                <div class="dashboard-card bg-white shadow rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-gray-700">KDJ Events</h3>
+                        <div class="p-2 bg-pink-100 rounded-md">
+                            <i class="fas fa-calendar-alt text-pink-500"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">Discover and register for upcoming events in Sri Lanka.</p>
+                    <a href="https://events.kdj.lk" class="text-pink-600 hover:text-pink-800 text-sm font-medium flex items-center">
+                        Explore Events
+                        <i class="fas fa-external-link-alt ml-2"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
 </div>
 
+<?php
+// Page specific scripts
+$additional_scripts = <<<HTML
 <script>
-    const loadingMessage = document.getElementById('loadingMessage');
-    const errorMessage = document.getElementById('errorMessage');
-    const dashboardContent = document.getElementById('dashboardContent');
-    const logoutButton = document.getElementById('logoutButton');
-
-    // Elements to display user data
-    const displayNameEl = document.getElementById('displayName');
-    const userIdEl = document.getElementById('userId');
-    const userEmailEl = document.getElementById('userEmail');
-    const userPhoneEl = document.getElementById('userPhone');
-    const userMfaEl = document.getElementById('userMfa');
-    const userRolesEl = document.getElementById('userRoles');
-
-    // Define the base URL for your API
-    const API_BASE_URL = 'https://auth.kdj.lk'; // Use HTTPS
-
-    // --- Authentication Check and Data Fetch ---
-    window.addEventListener('DOMContentLoaded', async () => {
-        const accessToken = localStorage.getItem('accessToken');
-
-        if (!accessToken) {
-            // No token found, redirect to login
-            window.location.href = 'login.php'; // Adjust if your login page has a different name
-            return;
+    // Configuration
+    const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
+    
+    // User profile data
+    let userData = null;
+    
+    // Set greeting based on time of day
+    function setGreeting() {
+        const hour = new Date().getHours();
+        let greeting = '';
+        
+        if (hour < 12) {
+            greeting = 'සුභ උදෑසනක්';
+        } else if (hour < 17) {
+            greeting = 'සුභ දහවලක්';
+        } else {
+            greeting = 'සුභ සන්ධ්‍යාවක්';
         }
-
+        
+        document.getElementById('sidebarGreeting').textContent = greeting;
+        document.getElementById('mobileSidebarGreeting').textContent = greeting;
+    }
+    
+    // Check if token expiration time is coming up
+    function isTokenExpiringSoon() {
+        const tokenExpiry = sessionStorage.getItem('token_expiry');
+        if (!tokenExpiry) return true;
+        
+        // Check if token expires in the next 5 minutes (300000 ms)
+        return parseInt(tokenExpiry) - 300000 < Date.now();
+    }
+    
+    // Refresh auth token
+    async function refreshAuthToken() {
+        const refreshToken = sessionStorage.getItem('refresh_token');
+        if (!refreshToken) return false;
+        
         try {
-            const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
-                method: 'GET',
+            const response = await fetch(`${apiBaseUrl}/auth/refresh-token`, {
+                method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Accept': 'application/json',
-                }
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ refresh_token: refreshToken }),
+                credentials: 'include'
             });
-
-            if (response.ok) {
-                const userData = await response.json();
-                displayUserData(userData);
-                loadingMessage.style.display = 'none';
-                dashboardContent.style.display = 'block';
-            } else if (response.status === 401) {
-                // Unauthorized - Token likely expired or invalid
-                handleLogout('Session expired. Please login again.');
-            } else {
-                // Other errors
-                const errorData = await response.json();
-                showError(`Failed to load dashboard: ${errorData.detail || response.statusText}`);
+            
+            if (!response.ok) {
+                console.error('Failed to refresh token:', response.status);
+                return false;
             }
-
+            
+            const data = await response.json();
+            
+            if (data.access_token) {
+                // Store the new token
+                sessionStorage.setItem('auth_token', data.access_token);
+                
+                // Update expiry time
+                if (data.expires_in) {
+                    const expiryTime = Date.now() + (data.expires_in * 1000);
+                    sessionStorage.setItem('token_expiry', expiryTime.toString());
+                }
+                
+                // Store refresh token if provided
+                if (data.refresh_token) {
+                    sessionStorage.setItem('refresh_token', data.refresh_token);
+                }
+                
+                return true;
+            }
+            
+            return false;
         } catch (error) {
-            console.error('Dashboard Load Error:', error);
-            showError('Could not connect to the server to load dashboard data.');
+            console.error('Token refresh error:', error);
+            return false;
         }
-    });
-
-    // --- Display User Data ---
-    function displayUserData(data) {
-        displayNameEl.textContent = data.display_name || data.email; // Fallback to email if no display name
-        userIdEl.textContent = data.uid || 'N/A';
-        userEmailEl.textContent = data.email || 'N/A';
-        userPhoneEl.textContent = data.phone_number || 'Not Provided';
-        userMfaEl.textContent = data.mfa_enabled ? 'Yes' : 'No';
-        userRolesEl.textContent = data.roles && data.roles.length > 0 ? data.roles.join(', ') : 'User';
     }
-
-    // --- Logout Functionality ---
-    logoutButton.addEventListener('click', async () => {
-        await handleLogout();
-    });
-
-    async function handleLogout(logoutMessage = 'You have been logged out.') {
-        const accessToken = localStorage.getItem('accessToken');
-
-        // Clear local storage regardless of API call success
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userId');
-
-        if (accessToken) {
-            try {
-                // Attempt to inform the backend about the logout
-                await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Accept': 'application/json',
+    
+    // Load user profile data with token refresh
+    async function loadUserProfile() {
+        try {
+            // Check if token needs refresh
+            if (isTokenExpiringSoon()) {
+                const refreshed = await refreshAuthToken();
+                if (!refreshed) {
+                    // If refresh failed and we're not on login page, redirect
+                    if (!window.location.pathname.includes('index.php')) {
+                        console.log("Token refresh failed, redirecting to login");
+                        window.location.href = '/index.php';
+                        return;
                     }
-                });
-                // We don't strictly need to wait for the response or check success,
-                // as the client-side session is already cleared.
-                console.log("Logout API call initiated.");
-            } catch (error) {
-                console.error("Error calling logout API:", error);
-                // Log the error but proceed with redirect
+                }
+            }
+            
+            showLoading();
+            
+            // Get auth token from session storage
+            const authToken = sessionStorage.getItem('auth_token');
+            
+            // Prepare headers with token if available
+            const headers = {
+                'Accept': 'application/json'
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            const response = await fetch(`${apiBaseUrl}/users/me`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: headers
+            });
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    // Clear session storage if unauthorized
+                    sessionStorage.removeItem('auth_token');
+                    sessionStorage.removeItem('token_expiry');
+                    
+                    // Redirect to login
+                    window.location.href = '/index.php';
+                    return;
+                }
+                
+                throw new Error('Failed to fetch profile');
+            }
+            
+            userData = await response.json();
+            
+            // Update sidebar with user name
+            document.getElementById('sidebarUserName').textContent = userData.display_name || userData.email;
+            document.getElementById('mobileSidebarUserName').textContent = userData.display_name || userData.email;
+            
+            // Update profile display
+            updateProfileDisplay(userData);
+            
+            hideLoading();
+        } catch (error) {
+            hideLoading();
+            console.error('Failed to load user profile:', error);
+            showToast('Failed to load profile data. Please try refreshing the page.', 'error');
+            
+            // If there's an auth error, redirect to login
+            if (error.message.includes('authentication') || error.message.includes('auth')) {
+                window.location.href = '/index.php';
             }
         }
-
-        // Redirect to login page
-        alert(logoutMessage); // Simple alert, replace with a nicer notification if desired
-        window.location.href = 'login.php'; // Adjust if needed
     }
-
-    // --- Error Handling ---
-    function showError(message) {
-        loadingMessage.style.display = 'none';
-        dashboardContent.style.display = 'none';
-        errorMessage.textContent = message;
-        errorMessage.style.display = 'block';
+    
+    // Update profile display with user data
+    function updateProfileDisplay(user) {
+        // Update header nav
+        const userDisplayName = document.getElementById('userDisplayName');
+        if (userDisplayName) {
+            userDisplayName.textContent = user.display_name || user.email;
+        }
+        
+        // Update profile summary elements
+        const profileName = document.getElementById('profileName');
+        const profileEmail = document.getElementById('profileEmail');
+        const profilePhone = document.getElementById('profilePhone');
+        const profileMFA = document.getElementById('profileMFA');
+        
+        if (profileName) profileName.textContent = user.display_name || 'No name set';
+        if (profileEmail) profileEmail.textContent = user.email;
+        
+        if (profilePhone) {
+            if (user.phone_number) {
+                profilePhone.textContent = user.phone_number;
+            } else {
+                profilePhone.textContent = 'Not set';
+            }
+        }
+        
+        if (profileMFA) {
+            profileMFA.textContent = user.mfa_enabled ? 'MFA: Enabled' : 'MFA: Disabled';
+        }
+        
+        // Email verification badge
+        const emailVerificationBadge = document.getElementById('emailVerificationBadge');
+        if (emailVerificationBadge) {
+            if (!user.email_verified) {
+                emailVerificationBadge.classList.remove('hidden');
+            } else {
+                emailVerificationBadge.classList.add('hidden');
+            }
+        }
     }
-
+    
+    // Mobile sidebar toggle
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
+    const closeMobileSidebar = document.getElementById('closeMobileSidebar');
+    
+    mobileSidebarToggle.addEventListener('click', function() {
+        mobileSidebar.classList.remove('hidden');
+        setTimeout(() => {
+            mobileSidebarContent.classList.remove('-translate-x-full');
+        }, 10);
+    });
+    
+    function closeSidebar() {
+        mobileSidebarContent.classList.add('-translate-x-full');
+        setTimeout(() => {
+            mobileSidebar.classList.add('hidden');
+        }, 300);
+    }
+    
+    closeMobileSidebar.addEventListener('click', closeSidebar);
+    
+    mobileSidebar.addEventListener('click', function(e) {
+        if (e.target === mobileSidebar) {
+            closeSidebar();
+        }
+    });
+    
+    // Sidebar logout
+    const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
+    const mobileSidebarLogoutBtn = document.getElementById('mobileSidebarLogoutBtn');
+    
+    function handleSidebarLogout() {
+        handleLogout();
+    }
+    
+    if (sidebarLogoutBtn) {
+        sidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
+    }
+    
+    if (mobileSidebarLogoutBtn) {
+        mobileSidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        setGreeting();
+        loadUserProfile();
+        
+        // Set up a periodic token refresh check every 5 minutes
+        setInterval(async () => {
+            if (isTokenExpiringSoon()) {
+                await refreshAuthToken();
+            }
+        }, 300000); // 5 minutes
+    });
 </script>
+HTML;
 
-</body>
-</html>
+// Include footer
+include 'footer.php';
+?>
