@@ -373,7 +373,7 @@ $additional_scripts = <<<HTML
         if (!refreshToken) return false;
         
         try {
-            const response = await fetch(`${apiBaseUrl}/auth/refresh-token`, {
+            const response = await fetch(`\${apiBaseUrl}/auth/refresh-token`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
