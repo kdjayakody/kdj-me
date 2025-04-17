@@ -335,6 +335,8 @@ $additional_scripts = <<<HTML
 <script>
     // Configuration
     const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
+
+    const API_BASE_URL = 'https://auth.kdj.lk';
     
     // User profile data
     let userData = null;
@@ -442,8 +444,7 @@ $additional_scripts = <<<HTML
             if (authToken) {
                 headers['Authorization'] = `Bearer ${authToken}`;
             }
-            
-            const response = await fetch(`${apiBaseUrl}/users/me`, {
+            const response = await fetch(`\${apiBaseUrl}/users/me`, {
                 method: 'GET',
                 credentials: 'include',
                 headers: headers
