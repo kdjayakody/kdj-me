@@ -35,8 +35,8 @@
         theme: {
           extend: {
             colors: {
-              'brand-red': '#ff3333', // Primary Red from previous examples
-              'brand-red-dark': '#e60000', // Darker shade for hover
+              'brand-red': '#cb2127', // Primary Red from previous examples
+              'brand-red-dark': '#8c0e12', // Darker shade for hover
               'brand-gray-light': '#f8fafc',
               'brand-gray-medium': '#e5e7eb',
               'brand-gray-dark': '#6b7280',
@@ -52,7 +52,7 @@
 <div class="w-full max-w-md bg-white rounded-2xl shadow-lg overflow-hidden">
     <div class="px-8 py-10 sm:px-10 sm:py-12">
         <div class="text-center">
-             <h1 class="text-xl font-semibold text-brand-text mb-2">KDJ Lanka</h1>
+            <img src="assets/img/kdjcolorlogo.png" style="width:40%; margin: auto;">
             <h2 class="text-2xl sm:text-3xl font-bold text-brand-text">ගිණුමට පිවිසෙන්න</h2>
             <p class="mt-2 text-sm text-brand-gray-dark">නැවතත් ඔබව සාදරයෙන් පිළිගනිමු!</p>
         </div>
