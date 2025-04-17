@@ -1,193 +1,236 @@
-<?php
-// Set page specific variables
-$title = "Login";
-$description = "Sign in to your KDJ Lanka account to access our services";
-$lang = "si";
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - KDJ Lanka</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        .login-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        p.subtitle {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #666;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: bold;
+        }
+        .form-group input[type="email"],
+        .form-group input[type="password"] {
+            width: 100%;
+            padding: 10px 10px 10px 35px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .form-group i {
+            position: absolute;
+            left: 10px;
+            top: 38px;
+            color: #999;
+        }
+        .form-group .toggle-password {
+            position: absolute;
+            right: 10px;
+            top: 38px;
+            cursor: pointer;
+            color: #999;
+        }
+        .form-group.remember-me {
+            display: flex;
+            align-items: center;
+        }
+        .form-group.remember-me input[type="checkbox"] {
+            margin-right: 5px;
+        }
+        .form-group.remember-me label {
+            display: inline-block;
+            font-weight: normal;
+            color: #666;
+        }
+        .form-group.links {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #ff3333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+            position: relative;
+        }
+        button:hover {
+            background-color: #cc0000;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        button i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .links {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .links a {
+            color: #ff3333;
+            text-decoration: none;
+            margin: 0 5px;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
 
-// Add page specific scripts/styles
-$additional_head = <<<HTML
-<style>
-    .auth-container {
-        background-image: url('/assets/images/sl-pattern.png');
-        background-size: cover;
-        background-position: center;
-    }
-    .login-card {
-        backdrop-filter: blur(10px);
-        background-color: rgba(255, 255, 255, 0.9);
-    }
-</style>
-HTML;
-
-// Include header
-include 'header.php';
-?>
-
-<div class="auth-container flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-    <div class="login-card max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-lg">
-        <div class="text-center">
-            <h2 class="mt-6 text-3xl font-extrabold text-kdj-dark">
-                ඇතුල් වන්න
-            </h2>
-            <p class="mt-2 text-sm text-gray-600">
-                ඔබගේ ගිණුමට ප්‍රවේශ වන්න
-            </p>
+<div class="login-container">
+    <h2>ඇතුල් වන්න</h2>
+    <p class="subtitle">ඔබගේ ගිණුමට ප්‍රවේශ වන්න</p>
+    <form id="loginForm">
+        <div class="form-group">
+            <label for="email">ඊමේල් ලිපිනය</label>
+            <i class="fas fa-envelope"></i>
+            <input type="email" id="email" name="email" required>
         </div>
-        
-        <form id="loginForm" class="mt-8 space-y-6" method="post" onsubmit="event.preventDefault();">
-            <input type="hidden" name="remember" value="true">
-            <div class="rounded-md shadow-sm -space-y-px">
-                <div>
-                    <label for="email" class="sr-only">ඊමේල් ලිපිනය</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="fas fa-envelope text-gray-400"></i>
-                        </div>
-                        <input id="email" name="email" type="email" autocomplete="email" required 
-                            class="appearance-none rounded-none relative block w-full px-3 py-3 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-kdj-red focus:border-kdj-red focus:z-10 sm:text-sm" 
-                            placeholder="ඊමේල් ලිපිනය">
-                    </div>
-                </div>
-                <div>
-                    <label for="password" class="sr-only">මුරපදය</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="fas fa-lock text-gray-400"></i>
-                        </div>
-                        <input id="password" name="password" type="password" autocomplete="current-password" required 
-                            class="appearance-none rounded-none relative block w-full px-3 py-3 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-kdj-red focus:border-kdj-red focus:z-10 sm:text-sm" 
-                            placeholder="මුරපදය">
-                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
-                            <button type="button" id="togglePassword" class="text-gray-400 focus:outline-none hover:text-gray-500">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+        <div class="form-group">
+            <label for="password">මුරපදය</label>
+            <i class="fas fa-lock"></i>
+            <input type="password" id="password" name="password" required>
+            <span class="toggle-password" id="togglePassword">
+                <i class="fas fa-eye"></i>
+            </span>
+        </div>
+        <div class="form-group links">
+            <div class="remember-me">
+                <input type="checkbox" id="remember_me" name="remember_me">
+                <label for="remember_me">මතක තබාගන්න</label>
             </div>
-
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <input id="remember_me" name="remember_me" type="checkbox" 
-                        class="h-4 w-4 text-kdj-red focus:ring-kdj-red border-gray-300 rounded">
-                    <label for="remember_me" class="ml-2 block text-sm text-gray-900">
-                        මතක තබාගන්න
-                    </label>
-                </div>
-
-                <div class="text-sm">
-                    <a href="forgot_password.php" class="font-medium text-kdj-red hover:text-red-800">
-                        මුරපදය අමතකද?
-                    </a>
-                </div>
-            </div>
-
             <div>
-                <button type="submit" id="submitButton" 
-                    class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-kdj-red hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red">
-                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                        <i class="fas fa-sign-in-alt"></i>
-                    </span>
-                    ඇතුල් වන්න
-                </button>
+                <a href="forgot_password.php">මුරපදය අමතකද?</a>
             </div>
-            
-            <div class="text-center">
-                <p class="text-sm text-gray-600">
-                    ගිණුමක් නැද්ද? <a href="register.php" class="font-medium text-kdj-red hover:text-red-800">ලියාපදිංචි වන්න</a>
-                </p>
-            </div>
-        </form>
+        </div>
+        <button type="submit" id="submitButton">
+            <i class="fas fa-sign-in-alt"></i>
+            ඇතුල් වන්න
+        </button>
+    </form>
+    <div id="messageArea" class="message"></div>
+    <div class="links">
+        ගිණුමක් නැද්ද? <a href="register.php">ලියාපදිංචි වන්න</a>
     </div>
 </div>
 
-<?php
-// Page specific scripts
-$additional_scripts = <<<HTML
 <script>
-    // Configuration
-    const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
-    const redirectUrlAfterLogin = 'dashboard.php';
-    
-    // Toggle password visibility
-    const togglePassword = document.getElementById('togglePassword');
-    const passwordInput = document.getElementById('password');
-    
-    togglePassword.addEventListener('click', function() {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        this.querySelector('i').classList.toggle('fa-eye');
-        this.querySelector('i').classList.toggle('fa-eye-slash');
-    });
-    
-    // Form submission
     const loginForm = document.getElementById('loginForm');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const rememberMeInput = document.getElementById('remember_me');
+    const messageArea = document.getElementById('messageArea');
     const submitButton = document.getElementById('submitButton');
-    
-    // Check if user is already logged in
-    async function checkSession() {
-        try {
-            // Get auth token from session storage
-            const authToken = sessionStorage.getItem('auth_token');
-            
-            // Prepare headers with token if available
-            const headers = {
-                'Accept': 'application/json'
-            };
-            
-            if (authToken) {
-                headers['Authorization'] = `Bearer ${authToken}`;
-            }
-            
-            const response = await fetch(`${apiBaseUrl}/users/me`, {
-                method: 'GET',
-                credentials: 'include',
-                headers: headers
-            });
-            
-            if (response.ok) {
-                // User is already logged in, redirect to dashboard
-                window.location.href = redirectUrlAfterLogin;
-            }
-        } catch (error) {
-            // Ignore errors - just proceed with login form
-            console.log("No active session found");
-        }
-    }
-    
-    // Call check session on page load
-    checkSession();
-    
+    const togglePassword = document.getElementById('togglePassword');
+
+    const API_BASE_URL = 'https://auth.kdj.lk';
+    const REDIRECT_URL = 'dashboard.php';
+
+    togglePassword.addEventListener('click', () => {
+        const type = passwordInput.type === 'password' ? 'text' : 'password';
+        passwordInput.type = type;
+        const icon = togglePassword.querySelector('i');
+        icon.classList.toggle('fa-eye');
+        icon.classList.toggle('fa-eye-slash');
+    });
+
     loginForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-        
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const rememberMe = document.getElementById('remember_me').checked;
-        
-        // Basic client-side validation
-        if (!email || !password) {
-            showToast('Please enter both email and password', 'error');
-            return;
-        }
-        
-        if (!isValidEmail(email)) {
-            showToast('Please enter a valid email address', 'error');
-            return;
-        }
-        
-        // Disable button and show loading
+
+        messageArea.style.display = 'none';
+        messageArea.className = 'message';
         submitButton.disabled = true;
-        const originalButtonText = submitButton.innerHTML;
-        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> සකසමින්...';
-        showLoading();
-        
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> සකසමින්...';
+
+        const email = emailInput.value;
+        const password = passwordInput.value;
+        const rememberMe = rememberMeInput.checked;
+
+        if (!email || !password) {
+            showMessage('කරුණාකර ඊමේල් සහ මුරපදය ඇතුළත් කරන්න', 'error');
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> ඇතුල් වන්න';
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            showMessage('කරුණාකර වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න', 'error');
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> ඇතුල් වන්න';
+            return;
+        }
+
         try {
-            const response = await fetch(`${apiBaseUrl}/auth/login`, {
+            const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
                 },
                 body: JSON.stringify({
                     email: email,
@@ -196,87 +239,72 @@ $additional_scripts = <<<HTML
                 }),
                 credentials: 'include'
             });
-            
-            const responseData = await response.json();
-            
+
+            const data = await response.json();
+
             if (response.ok) {
-                showToast('සාර්ථකව ඇතුල් විය!', 'success');
-                
-                // Store tokens consistently
-                if (responseData.access_token) {
-                    // Store access token
-                    sessionStorage.setItem('auth_token', responseData.access_token);
-                    
-                    // Store expiry time if provided
-                    if (responseData.expires_in) {
-                        const expiryTime = Date.now() + (responseData.expires_in * 1000);
+                showMessage('සාර්ථකව ඇතුල් විය!', 'success');
+
+                if (data.access_token) {
+                    sessionStorage.setItem('auth_token', data.access_token);
+                    if (data.expires_in) {
+                        const expiryTime = Date.now() + (data.expires_in * 1000);
                         sessionStorage.setItem('token_expiry', expiryTime.toString());
                     }
-                    
-                    // Store refresh token if provided
-                    if (responseData.refresh_token) {
-                        sessionStorage.setItem('refresh_token', responseData.refresh_token);
+                    if (data.refresh_token) {
+                        sessionStorage.setItem('refresh_token', data.refresh_token);
                     }
-                    
-                    // If requested to remember, also store user ID for reference
-                    if (rememberMe && responseData.user_id) {
-                        localStorage.setItem('user_id', responseData.user_id);
+                    if (rememberMe && data.user_id) {
+                        localStorage.setItem('user_id', data.user_id);
                     }
                 }
-                
-                // Check if MFA required
-                if (responseData.mfa_required && responseData.mfa_methods && responseData.mfa_methods.length > 0) {
-                    // Redirect to MFA page
-                    window.location.href = `mfa.php?methods=${responseData.mfa_methods.join(',')}`;
+
+                if (data.mfa_required && data.mfa_methods && data.mfa_methods.length > 0) {
+                    window.location.href = `mfa.php?methods=${data.mfa_methods.join(',')}`;
                     return;
                 }
-                
-                // Redirect after successful login
+
                 setTimeout(() => {
-                    window.location.href = redirectUrlAfterLogin;
+                    window.location.href = REDIRECT_URL;
                 }, 1000);
             } else {
-                // Login failed
                 let errorMessage = 'ඇතුල් වීමට නොහැක. ';
-                
-                if (responseData.detail) {
-                    if (typeof responseData.detail === 'string') {
-                        // Map common error messages to Sinhala
-                        if (responseData.detail.includes('Invalid email or password')) {
+                if (data.detail) {
+                    if (typeof data.detail === 'string') {
+                        if (data.detail.includes('Invalid email or password')) {
                             errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
-                        } else if (responseData.detail.includes('Token expired')) {
+                        } else if (data.detail.includes('Token expired')) {
                             errorMessage = 'සැසිය කල් ඉකුත් වී ඇත. නැවත පුරනය කරන්න.';
                         } else {
-                            errorMessage += responseData.detail;
+                            errorMessage += data.detail;
                         }
                     } else {
-                        errorMessage += JSON.stringify(responseData.detail);
+                        errorMessage += JSON.stringify(data.detail);
                     }
                 } else {
                     errorMessage += `Error code: ${response.status}`;
                 }
-                
-                showToast(errorMessage, 'error');
+                showMessage(errorMessage, 'error');
             }
         } catch (error) {
-            // Network error or other issue
-            showToast('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+            showMessage('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
         } finally {
-            // Re-enable button and hide loading
             submitButton.disabled = false;
-            submitButton.innerHTML = originalButtonText;
-            hideLoading();
+            submitButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> ඇතුල් වන්න';
         }
     });
-    
-    // Email validation helper
+
+    function showMessage(msg, type) {
+        messageArea.textContent = msg;
+        messageArea.classList.add(type);
+        messageArea.style.display = 'block';
+    }
+
     function isValidEmail(email) {
         const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
         return re.test(String(email).toLowerCase());
     }
 </script>
-HTML;
 
-// Include footer
-include 'footer.php';
-?>
+</body>
+</html>
