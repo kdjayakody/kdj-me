@@ -183,7 +183,7 @@ $additional_scripts = <<<HTML
         showLoading();
         
         try {
-            const response = await fetch(`${apiBaseUrl}/auth/login`, {
+            const response = await fetch(apiBaseUrl + '/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
