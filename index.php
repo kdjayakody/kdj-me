@@ -1,4 +1,15 @@
 <?php
+// Check if user is already logged in
+$auth_token = isset($_COOKIE['auth_token']) ? $_COOKIE['auth_token'] : '';
+if (empty($auth_token)) {
+    // Check for token in session storage via JavaScript
+    echo "<script>
+        if (sessionStorage.getItem('auth_token')) {
+            window.location.href = 'dashboard.php';
+        }
+    </script>";
+}
+
 // Set page specific variables
 $title = "Login";
 $description = "Sign in to your KDJ Lanka account";
@@ -320,35 +331,39 @@ $additional_scripts = <<<HTML
         return re.test(String(email).toLowerCase());
     }
     
-    // Check for redirect after login
+    // Check for redirect after login and verify logged-in state
     document.addEventListener('DOMContentLoaded', function() {
-        // Check if there's a redirect URL in sessionStorage
-        const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-        
-        if (redirectAfterLogin) {
-            // Check if already logged in
-            const authToken = sessionStorage.getItem('auth_token');
-            if (authToken) {
-                // Verify token validity
-                fetch(`\${apiBaseUrl}/users/me`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer \${authToken}`
-                    },
-                    credentials: 'include'
-                })
-                .then(response => {
-                    if (response.ok) {
+        // First check if user is already logged in, redirect to dashboard
+        const authToken = sessionStorage.getItem('auth_token');
+        if (authToken) {
+            // Verify token is valid
+            fetch(`\${apiBaseUrl}/users/me`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer \${authToken}`
+                },
+                credentials: 'include'
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Check if there's a specific redirect URL in sessionStorage
+                    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                    
+                    if (redirectAfterLogin) {
                         // User is logged in, redirect to the saved URL
                         sessionStorage.removeItem('redirectAfterLogin');
                         window.location.href = redirectAfterLogin;
+                    } else {
+                        // No saved redirect, go to dashboard
+                        window.location.href = REDIRECT_URL;
                     }
-                })
-                .catch(error => {
-                    console.error('Auth check error:', error);
-                });
-            }
+                }
+            })
+            .catch(error => {
+                console.error('Auth check error:', error);
+                // Token may be invalid, let user login again
+            });
         }
     });
 </script>
