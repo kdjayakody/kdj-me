@@ -202,27 +202,16 @@ $additional_scripts = <<<HTML
     }
     
     function handleLoginSuccess(data, rememberMe) {
-    showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
-    handleTokenStorage(data, rememberMe);
-    
-    // Redirect based on MFA status first
-    if (data.mfa_required && data.mfa_methods?.length > 0) {
-        window.location.href = `mfa.php?methods=${data.mfa_methods.join(',')}`;
-        return;
+        showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
+        handleTokenStorage(data, rememberMe);
+        
+        // Redirect based on MFA status
+        const redirectTarget = (data.mfa_required && data.mfa_methods?.length > 0)
+            ? `mfa.php?methods=\${data.mfa_methods.join(',')}` // MFA page
+            : REDIRECT_URL; // Dashboard
+        
+        setTimeout(() => { window.location.href = redirectTarget; }, 1000);
     }
-    
-    // Check if there's a stored redirect URL
-    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-    if (redirectAfterLogin) {
-        // Clear the stored redirect URL
-        sessionStorage.removeItem('redirectAfterLogin');
-        // Redirect to the stored URL
-        setTimeout(() => { window.location.href = redirectAfterLogin; }, 1000);
-    } else {
-        // Default redirect to dashboard
-        setTimeout(() => { window.location.href = REDIRECT_URL; }, 1000);
-    }
-}
     
     function handleTokenStorage(data, rememberMe) {
         const storage = rememberMe ? localStorage : sessionStorage;
@@ -344,18 +333,6 @@ $additional_scripts = <<<HTML
     
     // Check for redirect after login and verify logged-in state
     document.addEventListener('DOMContentLoaded', function() {
-         // Check for redirect_url parameter in the URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const redirectUrl = urlParams.get('redirect_url');
-        
-        // If redirect_url parameter exists, store it in sessionStorage
-        if (redirectUrl) {
-            // Optional: Basic validation to ensure the URL is internal
-            if (redirectUrl.startsWith('/') && !redirectUrl.includes('//')) {
-                sessionStorage.setItem('redirectAfterLogin', redirectUrl);
-            }
-        }
-        
         // First check if user is already logged in, redirect to dashboard
         const authToken = sessionStorage.getItem('auth_token');
         if (authToken) {
