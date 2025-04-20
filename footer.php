@@ -161,77 +161,113 @@
         }
         
         // Check if user is logged in by trying to fetch profile
-        function checkUserAuth() {
-            if (window.location.pathname.includes('dashboard') || 
-                window.location.pathname.includes('profile') || 
-                window.location.pathname.includes('settings') ||
-                window.location.pathname.includes('security')) {
-                
-                // Check if token is about to expire
-                const tokenExpiry = sessionStorage.getItem('token_expiry');
-                if (tokenExpiry && parseInt(tokenExpiry) - 300000 < Date.now()) {
-                    refreshAuthToken();
-                }
-                
-                // Get auth token from session storage
-                const authToken = sessionStorage.getItem('auth_token');
-                
-                // Prepare headers with token if available
-                const headers = {
-                    'Accept': 'application/json'
-                };
-                
-                if (authToken) {
-                    headers['Authorization'] = `Bearer ${authToken}`;
-                }
-                
-                fetch('https://auth.kdj.lk/api/v1/users/me', {
-                    method: 'GET',
-                    credentials: 'include',
-                    headers: headers
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        console.error('Auth check failed: ' + response.status);
-                        // Clear session storage if unauthorized
-                        if (response.status === 401) {
-                            // Try to refresh the token
-                            return refreshAuthToken().then(refreshed => {
-                                if (!refreshed) {
-                                    sessionStorage.removeItem('auth_token');
-                                    sessionStorage.removeItem('token_expiry');
-                                    sessionStorage.removeItem('refresh_token');
-                                    window.location.href = '/index.php';
-                                    return null;
-                                }
-                                
-                                // If token refreshed, try to get user again
-                                return checkUserAuth();
-                            });
+        // Check if user is logged in by trying to fetch profile
+function checkUserAuth() {
+    if (window.location.pathname.includes('dashboard') || 
+        window.location.pathname.includes('profile') || 
+        window.location.pathname.includes('settings') ||
+        window.location.pathname.includes('security')) {
+        
+        // Check if token is about to expire
+        const tokenExpiry = sessionStorage.getItem('token_expiry');
+        if (tokenExpiry && parseInt(tokenExpiry) - 300000 < Date.now()) {
+            refreshAuthToken();
+        }
+        
+        // Get auth token from session storage
+        const authToken = sessionStorage.getItem('auth_token');
+        
+        // Prepare headers with token if available
+        const headers = {
+            'Accept': 'application/json'
+        };
+        
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        
+        fetch('https://auth.kdj.lk/api/v1/users/me', {
+            method: 'GET',
+            credentials: 'include',
+            headers: headers
+        })
+        .then(response => {
+            if (!response.ok) {
+                console.error('Auth check failed: ' + response.status);
+                // Clear session storage if unauthorized
+                if (response.status === 401) {
+                    // Try to refresh the token
+                    return refreshAuthToken().then(refreshed => {
+                        if (!refreshed) {
+                            sessionStorage.removeItem('auth_token');
+                            sessionStorage.removeItem('token_expiry');
+                            sessionStorage.removeItem('refresh_token');
+                            window.location.href = '/index.php';
+                            return null;
                         }
                         
-                        // Redirect to login for other errors
-                        window.location.href = '/index.php';
-                        return null;
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data) {
-                        // Update user name in the header
-                        const userDisplayName = document.getElementById('userDisplayName');
-                        if (userDisplayName) {
-                            userDisplayName.textContent = data.display_name || data.email;
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Auth check error:', error);
-                    // Redirect to login on error
-                    window.location.href = '/index.php';
-                });
+                        // If token refreshed, try to get user again
+                        return checkUserAuth();
+                    });
+                }
+                
+                // Redirect to login for other errors
+                window.location.href = '/index.php';
+                return null;
             }
+            return response.json();
+        })
+        .then(data => {
+            if (data) {
+                // Update user name in the header
+                const userDisplayName = document.getElementById('userDisplayName');
+                if (userDisplayName) {
+                    userDisplayName.textContent = data.display_name || data.email;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Auth check error:', error);
+            // Redirect to login on error
+            window.location.href = '/index.php';
+        });
+    } else if (window.location.pathname.includes('index.php')) {
+        // For login page, check if already logged in
+        const authToken = sessionStorage.getItem('auth_token');
+        
+        if (authToken) {
+            const headers = {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            };
+            
+            fetch('https://auth.kdj.lk/api/v1/users/me', {
+                method: 'GET',
+                credentials: 'include',
+                headers: headers
+            })
+            .then(response => {
+                if (response.ok) {
+                    // User is logged in, check for redirect URL
+                    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                    
+                    if (redirectAfterLogin) {
+                        // Redirect to the stored URL
+                        sessionStorage.removeItem('redirectAfterLogin');
+                        window.location.href = redirectAfterLogin;
+                    } else {
+                        // Default redirect to dashboard
+                        window.location.href = 'dashboard.php';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Login page auth check error:', error);
+                // Token may be invalid, let user login again
+            });
         }
+    }
+}
 
         // Refresh auth token
         async function refreshAuthToken() {
