@@ -281,18 +281,32 @@
             }
         }
 
-        // Run auth check on protected pages
         document.addEventListener('DOMContentLoaded', function() {
-            checkUserAuth();
-            
-            // Set up periodic token refresh every 5 minutes
-            setInterval(async () => {
-                const tokenExpiry = sessionStorage.getItem('token_expiry');
-                if (tokenExpiry && parseInt(tokenExpiry) - 300000 < Date.now()) {
-                    await refreshAuthToken();
-                }
-            }, 300000); // 5 minutes
-        });
+    // Check for redirect_url parameter if on login page
+    if (window.location.pathname.includes('index.php')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectUrl = urlParams.get('redirect_url');
+        
+        // If redirect_url parameter exists, store it in sessionStorage
+        if (redirectUrl) {
+            // Optional: Basic validation to ensure the URL is internal
+            if (redirectUrl.startsWith('/') && !redirectUrl.includes('//')) {
+                sessionStorage.setItem('redirectAfterLogin', redirectUrl);
+            }
+        }
+    }
+    
+    // Run the auth check (this will redirect appropriately if already logged in)
+    checkUserAuth();
+    
+    // Set up periodic token refresh every 5 minutes
+    setInterval(async () => {
+        const tokenExpiry = sessionStorage.getItem('token_expiry');
+        if (tokenExpiry && parseInt(tokenExpiry) - 300000 < Date.now()) {
+            await refreshAuthToken();
+        }
+    }, 300000); // 5 minutes
+});
     </script>
     
     <?php if (isset($additional_scripts)) echo $additional_scripts; ?>
