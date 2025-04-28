@@ -1,4 +1,8 @@
 <?php
+
+$redirect_uri = isset($_GET['redirect_uri']) ? htmlspecialchars($_GET['redirect_uri'], ENT_QUOTES, 'UTF-8') : '';
+
+
 // Check if user is already logged in
 $auth_token = isset($_COOKIE['auth_token']) ? $_COOKIE['auth_token'] : '';
 if (empty($auth_token)) {
