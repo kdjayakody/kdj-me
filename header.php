@@ -73,12 +73,14 @@ if (isset($description)) {
   // Your web app's Firebase configuration
   // !! මේ ටික ඔයාගෙ Firebase Project Settings වලින් ගන්න ඕන !!
   const firebaseConfig = {
-    apiKey: "AIzaSyCJFdKtU5AGhDpsTvhWCXh8AaoQ8M4Frt4", // ඔයාගෙ config.py එකේ FIREBASE_WEB_API_KEY එක
-    authDomain: "kdj-lanka.firebaseapp.com",
-    projectId: "kdj-lanka",
-    storageBucket: "kdj-lanka.appspot.com",
-    messagingSenderId: "812675960947",
-    appId: "1:812675960947:web:bc57a1d19da73b9ac51a06"
+    apiKey: "AIzaSyCJFdKtU5AGhDpsTvhWCXh8AaoQ8M4Frt4",
+  authDomain: "kdj-lanka.firebaseapp.com",
+  databaseURL: "https://kdj-lanka-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kdj-lanka",
+  storageBucket: "kdj-lanka.appspot.com",
+  messagingSenderId: "812675960947",
+  appId: "1:812675960947:web:bc57a1d19da73b9ac51a06",
+  measurementId: "G-GGFCJZXE9T"
   };
 
   // Initialize Firebase
