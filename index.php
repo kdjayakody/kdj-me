@@ -1,7 +1,5 @@
 <?php
 
-$redirect_uri = isset($_GET['redirect_uri']) ? htmlspecialchars($_GET['redirect_uri'], ENT_QUOTES, 'UTF-8') : '';
-
 
 // Check if user is already logged in
 $auth_token = isset($_COOKIE['auth_token']) ? $_COOKIE['auth_token'] : '';
@@ -104,12 +102,26 @@ include 'header.php';
                     <span id="buttonText">ඇතුල් වන්න</span>
                 </button>
             </div>
-        </form>
+            </form> <div class="my-6 flex items-center justify-center">
+          <div class="border-t border-gray-300 flex-grow"></div>
+          <span class="px-4 text-sm text-gray-500 bg-white login-card">හෝ</span>
+          <div class="border-t border-gray-300 flex-grow"></div>
+      </div>
 
-        <div class="mt-8 text-center text-sm">
+      <div>
+          <button type="button" id="googleSignInButton"
+                  class="w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google icon" class="w-5 h-5 mr-2">
+              <span>Google සමඟින් පිවිසෙන්න</span>
+          </button>
+      </div>
+
+      <div class="mt-8 text-center text-sm">
             <span class="text-gray-600">ගිණුමක් නැද්ද?</span>
             <a href="register.php" class="font-medium text-kdj-red hover:text-red-800 hover:underline ml-1">ලියාපදිංචි වන්න</a>
         </div>
+
+        
     </div>
 </div>
 
@@ -133,6 +145,102 @@ $additional_scripts = <<<HTML
     const emailErrorEl = document.getElementById('emailError');
     const passwordErrorEl = document.getElementById('passwordError');
     
+
+    // Google Sign-In Button DOM Element
+const googleSignInButton = document.getElementById('googleSignInButton');
+
+// Google Sign-In Function
+async function signInWithGoogle() {
+    if (!firebaseAuth) {
+        showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. Firebase සූදානම් නැත.', 'error');
+        return;
+    }
+
+    const provider = new firebase.auth.GoogleAuthProvider();
+    // Optionally, you can add custom parameters or scopes
+    // provider.addScope('profile');
+    // provider.addScope('email');
+
+    clearMessages();
+    // Disable button while processing (optional, but good UX)
+    googleSignInButton.disabled = true;
+    googleSignInButton.querySelector('span').textContent = 'සකසමින්...';
+
+
+    try {
+        const result = await firebaseAuth.signInWithPopup(provider);
+        // This gives you a Google Access Token. You can use it to access the Google API.
+        // const credential = result.credential;
+        // const token = credential.accessToken; // Google Access Token
+        
+        // The signed-in user info.
+        const user = result.user;
+        
+        if (user) {
+            // Get the Firebase ID token. This is what you send to your backend.
+            const idToken = await user.getIdToken();
+            
+            // Send this idToken to your backend's /google-login endpoint
+            const backendResponse = await fetch(`${apiBaseUrl}/auth/google-login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ id_token: idToken }),
+                credentials: 'include' // Cookies යවන්න මේක වැදගත්
+            });
+
+            const backendData = await backendResponse.json();
+
+            if (backendResponse.ok) {
+                // Backend එකෙන් token එක ආවට පස්සෙ, email/password login එකේ වගේම handle කරන්න
+                // Google වලින් sign-in වෙනකොට "rememberMe" behavior එක default true දාමු දැනට
+                handleLoginSuccess(backendData, true); 
+            } else {
+                handleApiError(backendData, backendResponse.status);
+                googleSignInButton.disabled = false;
+                googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+            }
+        } else {
+            showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+            googleSignInButton.disabled = false;
+            googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+        }
+
+    } catch (error) {
+        // Handle Errors here.
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        // The email of the user's account used.
+        // const email = error.customData?.email; // Modular SDK
+        const email = error.email; // Compat SDK
+        // The AuthCredential type that was used.
+        // const credential = firebase.auth.GoogleAuthProvider.credentialFromError(error); // Modular SDK
+        // const credential = firebase.auth.GoogleAuthProvider.credentialFromError(error); // Compat SDK
+
+        console.error("Google Sign-In Error:", error);
+        let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
+        if (errorCode === 'auth/popup-closed-by-user') {
+            displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී.';
+        } else if (errorCode === 'auth/cancelled-popup-request') {
+            displayMessage = 'එකවර පිවිසුම් කවුළු කිහිපයක් විවෘත කර ඇත.';
+        } else {
+            displayMessage += errorMessage;
+        }
+        showMessage(displayMessage, 'error');
+        
+        googleSignInButton.disabled = false;
+        googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+    }
+}
+
+// Add Event Listener to Google Sign-In Button
+if (googleSignInButton) {
+    googleSignInButton.addEventListener('click', signInWithGoogle);
+}
+
+
     // Toggle password visibility
     togglePassword.addEventListener('click', () => {
         const type = passwordInput.type === 'password' ? 'text' : 'password';

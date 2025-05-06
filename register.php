@@ -1,6 +1,4 @@
 <?php
-$redirect_uri = isset($_GET['redirect_uri']) ? htmlspecialchars($_GET['redirect_uri'], ENT_QUOTES, 'UTF-8') : '';
-
 // Set page specific variables
 $title = "Register";
 $description = "Create a new KDJ Lanka account to access our services";
