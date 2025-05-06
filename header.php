@@ -70,30 +70,60 @@ if (isset($description)) {
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
 
 <script>
-  // Your web app's Firebase configuration
-  // !! මේ ටික ඔයාගෙ Firebase Project Settings වලින් ගන්න ඕන !!
   const firebaseConfig = {
     apiKey: "AIzaSyCJFdKtU5AGhDpsTvhWCXh8AaoQ8M4Frt4",
-  authDomain: "kdj-lanka.firebaseapp.com",
-  databaseURL: "https://kdj-lanka-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "kdj-lanka",
-  storageBucket: "kdj-lanka.appspot.com",
-  messagingSenderId: "812675960947",
-  appId: "1:812675960947:web:bc57a1d19da73b9ac51a06",
-  measurementId: "G-GGFCJZXE9T"
+    authDomain: "kdj-lanka.firebaseapp.com",
+    databaseURL: "https://kdj-lanka-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "kdj-lanka",
+    storageBucket: "kdj-lanka.appspot.com",
+    messagingSenderId: "812675960947",
+    appId: "1:812675960947:web:bc57a1d19da73b9ac51a06",
+    measurementId: "G-GGFCJZXE9T"
   };
 
-  // Initialize Firebase
-  let firebaseApp;
+
+// Initialize Firebase
+let firebaseApp;
   let firebaseAuth;
   try {
+    // Initialize Firebase with the config
     firebaseApp = firebase.initializeApp(firebaseConfig);
     firebaseAuth = firebase.auth(); // compat version
+    
+    // Apply settings to the Auth instance
+    firebaseAuth.useDeviceLanguage(); // Use browser language setting
+    
+    // Set persistence to match your application needs
+    // 'local' - persists across browser sessions (default)
+    // 'session' - only persists in current tab
+    // 'none' - no persistence 
+    firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+      .then(() => {
+        console.log("Firebase Auth persistence set!");
+      })
+      .catch((error) => {
+        console.error("Error setting auth persistence:", error);
+      });
+      
     console.log("Firebase Initialized Successfully!");
   } catch (e) {
     console.error("Error initializing Firebase:", e);
-    // මෙතන user ට message එකක් පෙන්නන්නත් පුළුවන් Firebase load වුනේ නැත්නම්.
-    showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. කරුණාකර පසුව උත්සහ කරන්න.', 'error');
+    
+    // Check if this is due to Firebase being initialized twice
+    if (e.code === 'app/duplicate-app') {
+      console.log("Firebase already initialized, retrieving existing app");
+      firebaseApp = firebase.app(); // Get the already initialized app
+      firebaseAuth = firebase.auth();
+    } else {
+      // Create a function to show error message that can be called from anywhere
+      window.showFirebaseError = function() {
+        if (typeof showMessage === 'function') {
+          showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. කරුණාකර පසුව උත්සහ කරන්න.', 'error');
+        } else {
+          alert('Google sign-in is currently unavailable. Please try again later.');
+        }
+      }
+    }
   }
 </script>
     

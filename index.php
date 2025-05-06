@@ -157,30 +157,80 @@ async function signInWithGoogle() {
     }
 
     const provider = new firebase.auth.GoogleAuthProvider();
-    // Optionally, you can add custom parameters or scopes
-    // provider.addScope('profile');
-    // provider.addScope('email');
+    // Add scopes to request user profile information
+    provider.addScope('profile');
+    provider.addScope('email');
+    
+    // Set custom parameters for Google Auth
+    provider.setCustomParameters({
+        'prompt': 'select_account'
+    });
 
     clearMessages();
-    // Disable button while processing (optional, but good UX)
+    // Disable button while processing
     googleSignInButton.disabled = true;
     googleSignInButton.querySelector('span').textContent = 'සකසමින්...';
 
-
     try {
-        const result = await firebaseAuth.signInWithPopup(provider);
-        // This gives you a Google Access Token. You can use it to access the Google API.
-        // const credential = result.credential;
-        // const token = credential.accessToken; // Google Access Token
+        // Try sign in with popup first
+        try {
+            const result = await firebaseAuth.signInWithPopup(provider);
+            handleGoogleAuthResult(result);
+        } catch (popupError) {
+            console.error("Popup sign-in failed, trying redirect method:", popupError);
+            
+            // If popup fails with auth/popup-blocked or similar, try redirect method
+            if (popupError.code === 'auth/popup-blocked' || 
+                popupError.code === 'auth/popup-closed-by-user' ||
+                popupError.code === 'auth/internal-error') {
+                
+                // Store a flag so we know to check for redirect result on page load
+                sessionStorage.setItem('googleSignInRedirect', 'true');
+                
+                // Use redirect method instead
+                await firebaseAuth.signInWithRedirect(provider);
+                return; // Function will exit, page will reload after redirect completes
+            } else {
+                // For other errors, propagate them to the main error handler
+                throw popupError;
+            }
+        }
+    } catch (error) {
+        console.error("Google Sign-In Error (detailed):", error);
         
-        // The signed-in user info.
-        const user = result.user;
+        const errorCode = error.code || 'unknown';
+        const errorMessage = error.message || 'Unknown error';
         
-        if (user) {
-            // Get the Firebase ID token. This is what you send to your backend.
+        let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
+        
+        if (errorCode === 'auth/popup-closed-by-user') {
+            displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී.';
+        } else if (errorCode === 'auth/cancelled-popup-request') {
+            displayMessage = 'එකවර පිවිසුම් කවුළු කිහිපයක් විවෘත කර ඇත.';
+        } else if (errorCode === 'auth/unauthorized-domain') {
+            displayMessage = 'මෙම වෙබ් අඩවිය Google පිවිසුම සඳහා බලයලත් නැත.';
+        } else if (errorCode === 'auth/internal-error') {
+            displayMessage = 'අභ්‍යන්තර දෝෂයක් ඇතිවිය. කරුණාකර පසුව නැවත උත්සහ කරන්න.';
+        } else {
+            displayMessage += errorMessage;
+        }
+        
+        showMessage(displayMessage, 'error');
+        
+        googleSignInButton.disabled = false;
+        googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+    }
+}
+
+async function handleGoogleAuthResult(result) {
+    const user = result.user;
+    
+    if (user) {
+        try {
+            // Get the Firebase ID token
             const idToken = await user.getIdToken();
             
-            // Send this idToken to your backend's /google-login endpoint
+            // Send this idToken to your backend
             const backendResponse = await fetch(`${apiBaseUrl}/auth/google-login`, {
                 method: 'POST',
                 headers: {
@@ -188,48 +238,26 @@ async function signInWithGoogle() {
                     'Accept': 'application/json',
                 },
                 body: JSON.stringify({ id_token: idToken }),
-                credentials: 'include' // Cookies යවන්න මේක වැදගත්
+                credentials: 'include'
             });
 
             const backendData = await backendResponse.json();
 
             if (backendResponse.ok) {
-                // Backend එකෙන් token එක ආවට පස්සෙ, email/password login එකේ වගේම handle කරන්න
-                // Google වලින් sign-in වෙනකොට "rememberMe" behavior එක default true දාමු දැනට
                 handleLoginSuccess(backendData, true); 
             } else {
                 handleApiError(backendData, backendResponse.status);
                 googleSignInButton.disabled = false;
                 googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
             }
-        } else {
-            showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+        } catch (error) {
+            console.error("Error processing Google Auth result:", error);
+            showMessage('Google පිවිසුම් තොරතුරු සැකසීමේදී දෝෂයක් ඇතිවිය.', 'error');
             googleSignInButton.disabled = false;
             googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
         }
-
-    } catch (error) {
-        // Handle Errors here.
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        // The email of the user's account used.
-        // const email = error.customData?.email; // Modular SDK
-        const email = error.email; // Compat SDK
-        // The AuthCredential type that was used.
-        // const credential = firebase.auth.GoogleAuthProvider.credentialFromError(error); // Modular SDK
-        // const credential = firebase.auth.GoogleAuthProvider.credentialFromError(error); // Compat SDK
-
-        console.error("Google Sign-In Error:", error);
-        let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
-        if (errorCode === 'auth/popup-closed-by-user') {
-            displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී.';
-        } else if (errorCode === 'auth/cancelled-popup-request') {
-            displayMessage = 'එකවර පිවිසුම් කවුළු කිහිපයක් විවෘත කර ඇත.';
-        } else {
-            displayMessage += errorMessage;
-        }
-        showMessage(displayMessage, 'error');
-        
+    } else {
+        showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. පරිශීලක තොරතුරු ලබාගත නොහැක.', 'error');
         googleSignInButton.disabled = false;
         googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
     }
@@ -445,6 +473,22 @@ if (googleSignInButton) {
     
     // Check for redirect after login and verify logged-in state
     document.addEventListener('DOMContentLoaded', function() {
+        if (sessionStorage.getItem('googleSignInRedirect') === 'true') {
+        sessionStorage.removeItem('googleSignInRedirect');
+        
+        // Check for redirect result
+        firebaseAuth.getRedirectResult()
+            .then(result => {
+                if (result.user) {
+                    handleGoogleAuthResult(result);
+                }
+            })
+            .catch(error => {
+                console.error("Redirect result error:", error);
+                let displayMessage = 'Google පිවිසීමේදී දෝෂයක් ඇතිවිය: ' + error.message;
+                showMessage(displayMessage, 'error');
+            });
+    }
         // First check if user is already logged in, redirect to dashboard
         const authToken = sessionStorage.getItem('auth_token');
         if (authToken) {
