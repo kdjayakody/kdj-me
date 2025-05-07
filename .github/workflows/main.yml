@@ -1,132 +1,38 @@
-name: Deploy to Production
+name: Deploy to aaPanel
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Reason for manual deployment'
-        required: true
-        default: 'Manual deployment'
 
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-          extensions: mbstring, intl, zip, pdo_mysql
-          tools: composer:v2
-      
-      - name: Install dependencies
-        run: |
-          if [ -f "composer.json" ]; then
-            composer install --no-progress --no-interaction --prefer-dist
-          fi
-      
-      - name: Syntax check
-        run: |
-          find . -type f -name "*.php" -not -path "./vendor/*" -print0 | xargs -0 -n1 php -l
-      
-      - name: Security check
-        run: |
-          if [ -f "composer.json" ]; then
-            composer require --dev roave/security-advisories:dev-latest
-          fi
-
   deploy:
-    name: Deploy
-    needs: test
     runs-on: ubuntu-latest
-    environment: production
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    
+
     - name: Set up SSH
       uses: webfactory/ssh-agent@v0.7.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-    
+
     - name: Configure SSH
       run: |
         mkdir -p ~/.ssh
-        echo -e "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile /dev/null\n" > ~/.ssh/config
-    
-    - name: Get commit information
-      id: commit
+        echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+
+    - name: Prepare for deployment
       run: |
-        echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
-        echo "::set-output name=message::$(git log -1 --pretty=%B)"
-        echo "::set-output name=author::$(git log -1 --pretty=%an)"
-    
-    - name: Create deployment archive
-      run: |
-        # Version information
-        echo "Version: $(date +'%Y-%m-%d %H:%M:%S')" > version.txt
-        echo "Commit: ${{ steps.commit.outputs.sha_short }}" >> version.txt
-        echo "Author: ${{ steps.commit.outputs.author }}" >> version.txt
-        
-        # Create deploy directory
-        mkdir -p deploy
-        
-        # Copy files, excluding deployment-specific files and directories
-        rsync -av --exclude='.git' \
-                  --exclude='.github' \
-                  --exclude='deploy' \
-                  --exclude='tests' \
-                  --exclude='README.md' \
-                  --exclude='.gitignore' \
-                  --exclude='.DS_Store' \
-                  --exclude='node_modules' \
-                  --exclude='.env' \
-                  --exclude='*.example' \
-                  --exclude='*.BAK' \
-                  --exclude='data/sensitive' \
-                  --exclude='composer.lock' \
-                  ./ deploy/
-        
-        # Remove any development-specific files
-        find deploy -name "*.dev.php" -type f -delete
-        find deploy -name "*.log" -type f -delete
-        
-        # Create .htaccess from the improved version if it exists
-        if [ -f ".htaccess.BAK" ]; then
-          cp .htaccess.BAK deploy/.htaccess
-        fi
-        
-        # Set proper permissions 
-        find deploy -type d -exec chmod 755 {} \;
-        find deploy -type f -exec chmod 644 {} \;
-    
-    - name: Backup remote directory
-      env:
-        SERVER_USER: ${{ secrets.SERVER_USER }}
-        SERVER_IP: ${{ secrets.SERVER_IP }}
-        SERVER_PATH: ${{ secrets.SERVER_PATH }}
-      run: |
-        # Create backup directory on server
-        ssh $SERVER_USER@$SERVER_IP "mkdir -p ${SERVER_PATH}_backups"
-        
-        # Create timestamp for backup
-        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-        
-        # Backup current deployment (excluding large data files)
-        ssh $SERVER_USER@$SERVER_IP "cd $SERVER_PATH && tar --exclude='data/uploads' --exclude='data/cache' -czf ${SERVER_PATH}_backups/backup_${TIMESTAMP}.tar.gz ."
-        
-        echo "Created backup at ${SERVER_PATH}_backups/backup_${TIMESTAMP}.tar.gz"
-    
+        # Create a list of files to deploy, excluding secrets and .htaccess
+        find . -type f -not -path "./data/*" -not -path "./.git/*" -not -name ".htaccess" > files_to_deploy.txt
+        mkdir -p to_deploy
+        while IFS= read -r file; do
+          mkdir -p "to_deploy/$(dirname "$file")"
+          cp "$file" "to_deploy/$file"
+        done < files_to_deploy.txt
+
     - name: Deploy to server
       env:
         SERVER_USER: ${{ secrets.SERVER_USER }}
@@ -134,68 +40,15 @@ jobs:
         SERVER_PATH: ${{ secrets.SERVER_PATH }}
       run: |
         echo "Deploying to server..."
+        # Use scp with recursive option to copy the directory structure
+        scp -r to_deploy/* $SERVER_USER@$SERVER_IP:$SERVER_PATH/
         
-        # Create data directory if it doesn't exist
-        ssh $SERVER_USER@$SERVER_IP "mkdir -p $SERVER_PATH/data/uploads $SERVER_PATH/data/cache"
-        
-        # Synchronize the files to maintain permissions on data directories
-        rsync -avz --delete-after \
-              --exclude='data/uploads' \
-              --exclude='data/cache' \
-              --exclude='.htaccess' \
-              --exclude='.user.ini' \
-              --exclude='config.php' \
-              deploy/ $SERVER_USER@$SERVER_IP:$SERVER_PATH/
-        
-        # Only copy .htaccess if it doesn't exist or if forced update
-        rsync -avz --ignore-existing deploy/.htaccess $SERVER_USER@$SERVER_IP:$SERVER_PATH/
-        
-        # Set permissions
+        # Execute commands on the server
         ssh $SERVER_USER@$SERVER_IP << EOF
         cd $SERVER_PATH
-        sudo chown -R www-data:www-data .
-        sudo find . -type d -exec chmod 755 {} \;
-        sudo find . -type f -exec chmod 644 {} \;
-        
-        # Make data directory writable
-        sudo chmod -R 775 data
-        
-        # Restart services
-        sudo systemctl restart php8.1-fpm || sudo systemctl restart php-fpm
-        sudo systemctl restart nginx
-        
-        # Clear cache
-        if [ -d "data/cache" ]; then
-          sudo rm -rf data/cache/*
-        fi
-        
-        echo "Deployment completed successfully!"
+        sudo chown -R www:www .
+        sudo chmod -R 755 .
+        sudo service nginx restart
+        sudo service php-fpm restart
+        echo "Deployment successful!"
         EOF
-    
-    - name: Verify deployment
-      env:
-        SERVER_USER: ${{ secrets.SERVER_USER }}
-        SERVER_IP: ${{ secrets.SERVER_IP }}
-        SERVER_PATH: ${{ secrets.SERVER_PATH }}
-      run: |
-        # Check if the site is responding
-        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://auth.kdj.lk)
-        if [ $HTTP_STATUS -ne 200 ]; then
-          echo "Warning: Site returned HTTP status $HTTP_STATUS instead of 200"
-          # Don't fail the deployment, but alert in the logs
-        else
-          echo "Site is responding with HTTP 200 OK"
-        fi
-        
-        # Create deployment record on server
-        DEPLOY_TIME=$(date +"%Y-%m-%d %H:%M:%S")
-        ssh $SERVER_USER@$SERVER_IP "echo '${DEPLOY_TIME} - Deployed commit ${{ steps.commit.outputs.sha_short }} by ${{ steps.commit.outputs.author }}' >> $SERVER_PATH/deploy_history.log"
-    
-    - name: Notify on Slack
-      uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        fields: repo,message,commit,author,action,eventName,workflow
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      if: always() && env.SLACK_WEBHOOK_URL != ''
