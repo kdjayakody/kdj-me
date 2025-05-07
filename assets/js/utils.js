@@ -527,161 +527,6 @@ setInterval(async () => {
     }
 }, 300000); // 5 minutes
 
-/**
- * Handle cross-domain authentication
- * This function checks for authentication tokens and ensures they work across domains
- * 
- * @param {boolean} forceRedirect - Whether to force redirect to dashboard if authenticated
- * @returns {Promise<boolean>} - Whether the user is authenticated
- */
-async function handleCrossDomainAuth(forceRedirect = false) {
-    try {
-        // Check for tokens in storage
-        const authToken = sessionStorage.getItem('auth_token');
-        const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token');
-        
-        if (!authToken && !refreshToken) {
-            return false; // No tokens available
-        }
-        
-        // If we have an auth token, verify it
-        if (authToken) {
-            try {
-                // Use our auth_handler to proxy the request (avoids CORS issues)
-                const response = await fetch('/auth_handler.php?action=verify', {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-                
-                if (response.ok) {
-                    // Token is valid
-                    const userData = await response.json();
-                    
-                    // If redirect is needed, handle it
-                    if (forceRedirect && window.location.pathname.includes('index.php')) {
-                        const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-                        if (redirectAfterLogin) {
-                            sessionStorage.removeItem('redirectAfterLogin');
-                            window.location.href = redirectAfterLogin;
-                        } else {
-                            window.location.href = 'dashboard.php';
-                        }
-                    }
-                    
-                    return true;
-                }
-                
-                // If token validation failed, try to refresh
-                if (refreshToken) {
-                    const refreshResponse = await fetch('/auth_handler.php?action=refresh', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({ refresh_token: refreshToken })
-                    });
-                    
-                    if (refreshResponse.ok) {
-                        const data = await refreshResponse.json();
-                        if (data.access_token) {
-                            // Store the new token
-                            sessionStorage.setItem('auth_token', data.access_token);
-                            
-                            // Update expiry time
-                            if (data.expires_in) {
-                                const expiryTime = Date.now() + (data.expires_in * 1000);
-                                sessionStorage.setItem('token_expiry', expiryTime.toString());
-                            }
-                            
-                            // Store refresh token if provided
-                            if (data.refresh_token) {
-                                if (localStorage.getItem('refresh_token')) {
-                                    localStorage.setItem('refresh_token', data.refresh_token);
-                                } else {
-                                    sessionStorage.setItem('refresh_token', data.refresh_token);
-                                }
-                            }
-                            
-                            // If redirect is needed, handle it
-                            if (forceRedirect && window.location.pathname.includes('index.php')) {
-                                const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-                                if (redirectAfterLogin) {
-                                    sessionStorage.removeItem('redirectAfterLogin');
-                                    window.location.href = redirectAfterLogin;
-                                } else {
-                                    window.location.href = 'dashboard.php';
-                                }
-                            }
-                            
-                            return true;
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Auth check error:', error);
-            }
-        } else if (refreshToken) {
-            // No auth token but we have a refresh token, try to use it
-            try {
-                const refreshResponse = await fetch('/auth_handler.php?action=refresh', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ refresh_token: refreshToken })
-                });
-                
-                if (refreshResponse.ok) {
-                    const data = await refreshResponse.json();
-                    if (data.access_token) {
-                        // Store the new token
-                        sessionStorage.setItem('auth_token', data.access_token);
-                        
-                        // Update expiry time
-                        if (data.expires_in) {
-                            const expiryTime = Date.now() + (data.expires_in * 1000);
-                            sessionStorage.setItem('token_expiry', expiryTime.toString());
-                        }
-                        
-                        // Store refresh token if provided
-                        if (data.refresh_token) {
-                            if (localStorage.getItem('refresh_token')) {
-                                localStorage.setItem('refresh_token', data.refresh_token);
-                            } else {
-                                sessionStorage.setItem('refresh_token', data.refresh_token);
-                            }
-                        }
-                        
-                        // If redirect is needed, handle it
-                        if (forceRedirect && window.location.pathname.includes('index.php')) {
-                            const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-                            if (redirectAfterLogin) {
-                                sessionStorage.removeItem('redirectAfterLogin');
-                                window.location.href = redirectAfterLogin;
-                            } else {
-                                window.location.href = 'dashboard.php';
-                            }
-                        }
-                        
-                        return true;
-                    }
-                }
-            } catch (error) {
-                console.error('Refresh token error:', error);
-            }
-        }
-    } catch (error) {
-        console.error('Cross-domain auth error:', error);
-    }
-    
-    return false;
-}
-
 // Initialize common functionality
 document.addEventListener('DOMContentLoaded', function() {
     // Set up CSRF token if not already set
@@ -693,18 +538,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
     if (redirectAfterLogin && window.location.pathname.includes('index.php')) {
         // Check if already logged in
-        handleCrossDomainAuth(true).then(isAuthenticated => {
-            if (isAuthenticated) {
+        checkUserAuthentication().then(userData => {
+            if (userData) {
                 // User is logged in, redirect to the saved URL
                 sessionStorage.removeItem('redirectAfterLogin');
                 window.location.href = redirectAfterLogin;
             }
         });
-    } else if (window.location.pathname.includes('index.php')) {
-        // Always check for auth on index page
-        handleCrossDomainAuth(true);
-    } else {
-        // Check auth but don't force redirect on other pages
-        handleCrossDomainAuth(false);
     }
 });
