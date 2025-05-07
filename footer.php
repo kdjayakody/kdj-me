@@ -159,7 +159,7 @@
         }
         
         // Check if user is logged in on protected pages
-        function checkUserAuth() {
+          function checkUserAuth() {
             const protectedPages = [
                 'dashboard.php',
                 'profile.php',
