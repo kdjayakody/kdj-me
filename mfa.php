@@ -107,199 +107,197 @@ include 'header.php';
 // Page specific scripts
 $additional_scripts = <<<HTML
 <script>
-    // Configuration
-    const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
-    const redirectUrlAfterLogin = 'dashboard.php';
-    
-    // Parse available methods from URL query parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const methodsParam = urlParams.get('methods');
-    let availableMethods = ['totp'];
-    
-    if (methodsParam) {
-        availableMethods = methodsParam.split(',');
+   // Configuration
+const apiBaseUrl = 'https://auth.kdj.lk/api/v1'; // Make sure this matches your setup
+const redirectUrlAfterLogin = 'dashboard.php'; // Default if no 'next' param
+
+// Parse available methods from URL query parameter
+const urlParamsMFA = new URLSearchParams(window.location.search); // Renamed to avoid conflict if any
+const methodsParam = urlParamsMFA.get('methods');
+let availableMethods = ['totp']; // Default
+
+if (methodsParam) {
+    availableMethods = methodsParam.split(',');
+    if(document.getElementById('methodsInput')) { // Ensure element exists
         document.getElementById('methodsInput').value = methodsParam;
     }
-    
-    // Show method selector if multiple methods are available
-    if (availableMethods.length > 1) {
-        document.getElementById('methodSelectorContainer').classList.remove('hidden');
-    }
-    
-    // Check if there's a token in session storage (from login)
-    const authToken = sessionStorage.getItem('auth_token');
-    if (!authToken) {
-        // Redirect to login if no token
-        window.location.href = 'index.php';
-    }
-    
-    // OTP input handling
-    const otpInputs = [
-        document.getElementById('otp1'),
-        document.getElementById('otp2'),
-        document.getElementById('otp3'),
-        document.getElementById('otp4'),
-        document.getElementById('otp5'),
-        document.getElementById('otp6')
-    ];
-    
-    // Focus on the first input when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        otpInputs[0].focus();
-    });
-    
-    // Handle OTP input behavior
+}
+
+// Show method selector if multiple methods are available
+if (availableMethods.length > 1 && document.getElementById('methodSelectorContainer')) {
+    document.getElementById('methodSelectorContainer').classList.remove('hidden');
+}
+
+// Check if there's a token in session storage (from login)
+const authTokenMFA = sessionStorage.getItem('auth_token'); // Renamed to avoid conflict
+if (!authTokenMFA) {
+    window.location.href = 'index.php'; // Redirect to login if no token
+}
+
+// OTP input handling
+const otpInputs = Array.from(document.querySelectorAll('.otp-input')); // Ensure these have the class 'otp-input'
+const totpCodeInput = document.getElementById('totpCode'); // Hidden input for combined code
+
+if (otpInputs.length > 0 && otpInputs[0]) { // Ensure inputs exist
+    otpInputs[0].focus(); // Focus on the first input when page loads
+
     otpInputs.forEach((input, index) => {
-        // Move to next input when a digit is entered
         input.addEventListener('input', function() {
-            // Update the value to ensure it's only a digit
-            const sanitizedValue = this.value.replace(/[^0-9]/g, '');
-            this.value = sanitizedValue;
-            
-            if (sanitizedValue && index < otpInputs.length - 1) {
+            this.value = this.value.replace(/[^0-9]/g, ''); // Allow only digits
+            if (this.value && index < otpInputs.length - 1) {
                 otpInputs[index + 1].focus();
             }
-            
-            // Combine all values into the hidden input
-            const combinedCode = otpInputs.map(input => input.value).join('');
-            document.getElementById('totpCode').value = combinedCode;
-            
-            // Submit the form if all 6 digits are entered
-            if (combinedCode.length === 6 && /^[0-9]{6}$/.test(combinedCode)) {
-                setTimeout(() => {
-                    document.getElementById('mfaForm').dispatchEvent(new Event('submit'));
-                }, 250);
+            if (totpCodeInput) { // Ensure hidden input exists
+                totpCodeInput.value = otpInputs.map(inp => inp.value).join('');
+            }
+            // Auto-submit if all 6 digits are entered
+            if (totpCodeInput && totpCodeInput.value.length === 6 && /^[0-9]{6}$/.test(totpCodeInput.value)) {
+                 if(document.getElementById('mfaForm')) { // Ensure form exists
+                    setTimeout(() => { // Short delay to allow input update
+                        document.getElementById('mfaForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    }, 100);
+                 }
             }
         });
-        
-        // Handle backspace key
+
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Backspace' && !this.value && index > 0) {
                 otpInputs[index - 1].focus();
             }
         });
-        
-        // Allow pasting the entire OTP
+
         input.addEventListener('paste', function(e) {
             e.preventDefault();
-            const pasteData = e.clipboardData.getData('text');
+            const pasteData = (e.clipboardData || window.clipboardData).getData('text');
             if (/^[0-9]{6}$/.test(pasteData)) {
-                // Distribute the 6 digits among the inputs
-                for (let i = 0; i < otpInputs.length; i++) {
-                    otpInputs[i].value = pasteData.charAt(i);
-                }
-                document.getElementById('totpCode').value = pasteData;
-                
-                // Submit the form
-                setTimeout(() => {
-                    document.getElementById('mfaForm').dispatchEvent(new Event('submit'));
-                }, 250);
+                pasteData.split('').forEach((char, i) => {
+                    if (otpInputs[i]) otpInputs[i].value = char;
+                });
+                if (totpCodeInput) totpCodeInput.value = pasteData;
+                if (otpInputs.length > 0 && otpInputs[otpInputs.length - 1]) otpInputs[otpInputs.length - 1].focus(); // Focus last input
+                 if(document.getElementById('mfaForm')) { // Ensure form exists
+                    setTimeout(() => { // Auto-submit after paste
+                         document.getElementById('mfaForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    }, 100);
+                 }
             }
         });
     });
-    
-    // Handle method selection
-    const authMethodSelect = document.getElementById('authMethod');
-    const totpContainer = document.getElementById('totpContainer');
-    const backupContainer = document.getElementById('backupContainer');
-    
+}
+
+
+// Handle method selection
+const authMethodSelect = document.getElementById('authMethod');
+const totpContainer = document.getElementById('totpContainer');
+const backupContainer = document.getElementById('backupContainer');
+const backupCodeInputEl = document.getElementById('backupCode'); // Renamed for clarity
+
+if (authMethodSelect) { // Ensure select element exists
     authMethodSelect.addEventListener('change', function() {
         if (this.value === 'totp') {
-            totpContainer.classList.remove('hidden');
-            backupContainer.classList.add('hidden');
-            otpInputs[0].focus();
+            if(totpContainer) totpContainer.classList.remove('hidden');
+            if(backupContainer) backupContainer.classList.add('hidden');
+            if (otpInputs.length > 0 && otpInputs[0]) otpInputs[0].focus();
         } else if (this.value === 'backup') {
-            totpContainer.classList.add('hidden');
-            backupContainer.classList.remove('hidden');
-            document.getElementById('backupCode').focus();
+            if(totpContainer) totpContainer.classList.add('hidden');
+            if(backupContainer) backupContainer.classList.remove('hidden');
+            if(backupCodeInputEl) backupCodeInputEl.focus();
         }
     });
-    
-    // Handle "Use backup code" link
-    document.getElementById('showBackupLink').addEventListener('click', function(e) {
+}
+
+// Handle "Use backup code" link
+const showBackupLink = document.getElementById('showBackupLink');
+if (showBackupLink) { // Ensure link exists
+    showBackupLink.addEventListener('click', function(e) {
         e.preventDefault();
-        
         if (availableMethods.includes('backup')) {
-            authMethodSelect.value = 'backup';
-            totpContainer.classList.add('hidden');
-            backupContainer.classList.remove('hidden');
-            document.getElementById('backupCode').focus();
-            
-            // Show method selector if it was hidden
-            document.getElementById('methodSelectorContainer').classList.remove('hidden');
+            if(authMethodSelect) authMethodSelect.value = 'backup'; // Ensure select exists
+            if(totpContainer) totpContainer.classList.add('hidden');
+            if(backupContainer) backupContainer.classList.remove('hidden');
+            if(backupCodeInputEl) backupCodeInputEl.focus();
+            if(document.getElementById('methodSelectorContainer')) { // Ensure container exists
+                document.getElementById('methodSelectorContainer').classList.remove('hidden');
+            }
         } else {
-            showToast('Backup codes are not enabled for your account.', 'error');
+            if (typeof showToast === 'function') showToast('Backup codes are not enabled for your account.', 'error');
         }
     });
-    
-    // Handle form submission
-    const mfaForm = document.getElementById('mfaForm');
-    const verifyButton = document.getElementById('verifyButton');
-    
+}
+
+// Handle form submission
+const mfaForm = document.getElementById('mfaForm');
+const verifyButton = document.getElementById('verifyButton');
+
+if (mfaForm) { // Ensure form exists
     mfaForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-        
-        const method = authMethodSelect.value;
+
+        const currentMethod = authMethodSelect ? authMethodSelect.value : 'totp'; // Default to totp if selector not present
         let code = '';
-        
-        if (method === 'totp') {
-            code = document.getElementById('totpCode').value;
+
+        if (currentMethod === 'totp') {
+            if (totpCodeInput) code = totpCodeInput.value; // Ensure hidden input exists
             if (code.length !== 6 || !/^[0-9]{6}$/.test(code)) {
-                showToast('Please enter a valid 6-digit verification code.', 'error');
+                if (typeof showToast === 'function') showToast('Please enter a valid 6-digit verification code.', 'error');
                 return;
             }
-        } else if (method === 'backup') {
-            code = document.getElementById('backupCode').value.replace(/[^A-Za-z0-9]/g, '');
-            if (code.length < 10) {
-                showToast('Please enter a valid backup code.', 'error');
+        } else if (currentMethod === 'backup') {
+            if (backupCodeInputEl) code = backupCodeInputEl.value.replace(/[^A-Za-z0-9-]/g, ''); // Allow hyphens
+            if (code.length < 8) { // Backup codes are often longer, e.g. XXXX-XXXX
+                if (typeof showToast === 'function') showToast('Please enter a valid backup code.', 'error');
                 return;
             }
         }
-        
-        // Disable button and show loading
-        verifyButton.disabled = true;
-        const originalButtonText = verifyButton.innerHTML;
-        verifyButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Verifying...';
-        showLoading();
-        
+
+        if (verifyButton) { // Ensure button exists
+            verifyButton.disabled = true;
+            verifyButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Verifying...';
+        }
+        if (typeof showLoading === 'function') showLoading();
+
         try {
             const response = await fetch(`\${apiBaseUrl}/auth/mfa/verify`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'Authorization': `Bearer \${authToken}`
+                    'Authorization': `Bearer \${authTokenMFA}` // Use the token fetched at the start
                 },
-                body: JSON.stringify({
-                    code: code,
-                    method: method
-                }),
+                body: JSON.stringify({ code: code, method: currentMethod }),
                 credentials: 'include'
             });
-            
+
             const responseData = await response.json();
-            
+            if (typeof hideLoading === 'function') hideLoading();
+
             if (response.ok) {
-                showToast('Authentication successful!', 'success');
-                
-                // Update token if provided
-                if (responseData.access_token) {
+                if (typeof showToast === 'function') showToast('Authentication successful!', 'success');
+
+                if (responseData.access_token) { // If API returns a new token after MFA
                     sessionStorage.setItem('auth_token', responseData.access_token);
+                     if (responseData.expires_in) {
+                        const expiryTime = Date.now() + (responseData.expires_in * 1000);
+                        sessionStorage.setItem('token_expiry', expiryTime.toString());
+                    }
                 }
-                
-                // Redirect to dashboard
+
+                // --- අලුතින්: MFA එකෙන් පස්සේ redirect වෙන තැන තීරණය කිරීම ---
+                const nextUrlAfterMfa = urlParamsMFA.get('next'); // Login page එකෙන් pass කරපු 'next' URL එක
+                const finalRedirectAfterMfa = nextUrlAfterMfa || redirectUrlAfterLogin; // redirectUrlAfterLogin is 'dashboard.php'
+
                 setTimeout(() => {
-                    window.location.href = redirectUrlAfterLogin;
+                    window.location.href = finalRedirectAfterMfa;
                 }, 1000);
+
             } else {
                 let errorMessage = 'Verification failed. ';
-                
                 if (responseData.detail) {
                     if (typeof responseData.detail === 'string') {
                         if (responseData.detail.includes('Invalid code')) {
                             errorMessage = 'Invalid verification code. Please try again.';
                         } else if (responseData.detail.includes('expired')) {
-                            errorMessage = 'Verification code expired. Please generate a new code.';
+                            errorMessage = 'Verification code expired. Please use a new code.';
                         } else {
                             errorMessage += responseData.detail;
                         }
@@ -309,26 +307,45 @@ $additional_scripts = <<<HTML
                 } else {
                     errorMessage += `Error code: \${response.status}`;
                 }
-                
-                showToast(errorMessage, 'error');
-                
-                // Clear OTP inputs
-                if (method === 'totp') {
-                    otpInputs.forEach(input => { input.value = ''; });
-                    document.getElementById('totpCode').value = '';
-                    otpInputs[0].focus();
+                if (typeof showToast === 'function') showToast(errorMessage, 'error');
+
+                if (currentMethod === 'totp') {
+                    otpInputs.forEach(input => { if(input) input.value = ''; });
+                    if(totpCodeInput) totpCodeInput.value = '';
+                    if (otpInputs.length > 0 && otpInputs[0]) otpInputs[0].focus();
+                } else if (currentMethod === 'backup' && backupCodeInputEl) {
+                    backupCodeInputEl.value = '';
+                    backupCodeInputEl.focus();
                 }
             }
         } catch (error) {
+            if (typeof hideLoading === 'function') hideLoading();
             console.error('MFA verification error:', error);
-            showToast('Failed to verify code. Please try again.', 'error');
+            if (typeof showToast === 'function') showToast('Failed to verify code. Network or server error.', 'error');
         } finally {
-            // Re-enable button and hide loading
-            verifyButton.disabled = false;
-            verifyButton.innerHTML = originalButtonText;
-            hideLoading();
+            if (verifyButton) { // Ensure button exists
+                verifyButton.disabled = false;
+                verifyButton.innerHTML = '<span class="absolute left-0 inset-y-0 flex items-center pl-3"><i class="fas fa-lock"></i></span>Verify';
+            }
         }
     });
+}
+
+// Initial setup based on available methods
+document.addEventListener('DOMContentLoaded', function() {
+    if (authMethodSelect && availableMethods.length <= 1 && availableMethods.includes('totp')) {
+        // If only TOTP is available and it's the default, hide selector
+        if(document.getElementById('methodSelectorContainer')) {
+            document.getElementById('methodSelectorContainer').classList.add('hidden');
+        }
+        if(totpContainer) totpContainer.classList.remove('hidden');
+        if(backupContainer) backupContainer.classList.add('hidden');
+    } else if (authMethodSelect && !availableMethods.includes(authMethodSelect.value)) {
+        // If current selection is not available, switch to the first available one
+        authMethodSelect.value = availableMethods[0];
+        authMethodSelect.dispatchEvent(new Event('change')); // Trigger change handler
+    }
+});
 </script>
 HTML;
 
