@@ -1,6 +1,4 @@
 <?php
-
-
 // Check if user is already logged in
 $auth_token = isset($_COOKIE['auth_token']) ? $_COOKIE['auth_token'] : '';
 if (empty($auth_token)) {
@@ -16,6 +14,9 @@ if (empty($auth_token)) {
 $title = "Login";
 $description = "Sign in to your KDJ Lanka account";
 $lang = "si";
+
+// Define API base URL
+$apiBaseUrl = 'https://auth.kdj.lk/api/v1';
 
 // Add page specific scripts/styles
 $additional_head = <<<HTML
@@ -34,6 +35,13 @@ $additional_head = <<<HTML
         outline: none;
         border-color: #f87171;
         box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
+    /* Google Sign-In button */
+    .google-signin-btn {
+        transition: all 0.3s ease;
+    }
+    .google-signin-btn:hover {
+        background-color: #f3f4f6;
     }
 </style>
 HTML;
@@ -102,34 +110,34 @@ include 'header.php';
                     <span id="buttonText">ඇතුල් වන්න</span>
                 </button>
             </div>
-            </form> <div class="my-6 flex items-center justify-center">
-          <div class="border-t border-gray-300 flex-grow"></div>
-          <span class="px-4 text-sm text-gray-500 bg-white login-card">හෝ</span>
-          <div class="border-t border-gray-300 flex-grow"></div>
-      </div>
-      <div>
-          <button type="button" style="opacity:0.5" id="googleSignInButton"
-                  class="w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed">
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google icon" class="w-5 h-5 mr-2">
-              <span>Google සමඟින් පිවිසෙන්න</span>
-          </button>
-      </div>
+        </form>
+        
+        <div class="my-6 flex items-center justify-center">
+            <div class="border-t border-gray-300 flex-grow"></div>
+            <span class="px-4 text-sm text-gray-500 bg-white login-card">හෝ</span>
+            <div class="border-t border-gray-300 flex-grow"></div>
+        </div>
+        
+        <div>
+            <button type="button" id="googleSignInButton" class="google-signin-btn w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red transition duration-150 ease-in-out">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google icon" class="w-5 h-5 mr-2">
+                <span>Google සමඟින් පිවිසෙන්න</span>
+            </button>
+        </div>
 
-      <div class="mt-8 text-center text-sm">
+        <div class="mt-8 text-center text-sm">
             <span class="text-gray-600">ගිණුමක් නැද්ද?</span>
             <a href="register.php" class="font-medium text-kdj-red hover:text-red-800 hover:underline ml-1">ලියාපදිංචි වන්න</a>
         </div>
-
-        
     </div>
 </div>
 
 <?php
-// Page specific scripts
+// Page specific scripts - adding the API base URL as a JavaScript variable at the beginning
 $additional_scripts = <<<HTML
 <script>
     // Configuration
-    const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
+    const apiBaseUrl = '{$apiBaseUrl}';
     const REDIRECT_URL = 'dashboard.php';
     
     // DOM Elements
@@ -144,100 +152,176 @@ $additional_scripts = <<<HTML
     const emailErrorEl = document.getElementById('emailError');
     const passwordErrorEl = document.getElementById('passwordError');
     
-
     // Google Sign-In Button DOM Element
-const googleSignInButton = document.getElementById('googleSignInButton');
+    const googleSignInButton = document.getElementById('googleSignInButton');
 
-// Google Sign-In Function
-async function signInWithGoogle() {
-    if (!firebaseAuth) {
-        showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. Firebase සූදානම් නැත.', 'error');
-        return;
-    }
+    // Google Sign-In Function
+    async function signInWithGoogle() {
+        if (!firebaseAuth) {
+            showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. Firebase සූදානම් නැත.', 'error');
+            return;
+        }
 
-    const provider = new firebase.auth.GoogleAuthProvider();
-    // Optionally, you can add custom parameters or scopes
-    // provider.addScope('profile');
-    // provider.addScope('email');
+        clearMessages();
+        // Disable button while processing
+        googleSignInButton.disabled = true;
+        googleSignInButton.querySelector('span').textContent = 'සකසමින්...';
+        showLoading();
 
-    clearMessages();
-    // Disable button while processing (optional, but good UX)
-    googleSignInButton.disabled = true;
-    googleSignInButton.querySelector('span').textContent = 'සකසමින්...';
-
-
-    try {
-        const result = await firebaseAuth.signInWithPopup(provider);
-        // This gives you a Google Access Token. You can use it to access the Google API.
-        // const credential = result.credential;
-        // const token = credential.accessToken; // Google Access Token
-        
-        // The signed-in user info.
-        const user = result.user;
-        
-        if (user) {
-            // Get the Firebase ID token. This is what you send to your backend.
-            const idToken = await user.getIdToken();
+        try {
+            // Create a Google Auth Provider with explicit scopes
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
             
-            // Send this idToken to your backend's /google-login endpoint
-            const backendResponse = await fetch(`https://auth.kdj.lk/api/v1/auth/google-login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ id_token: idToken }),
-                credentials: 'include' // Cookies යවන්න මේක වැදගත්
+            // Set custom parameters for the Google provider
+            provider.setCustomParameters({
+                // Forces account selection even when one account is available
+                prompt: 'select_account',
+                // Specify Firebase project domain for better security
+                auth_domain: 'kdj-lanka.firebaseapp.com'
             });
 
-            const backendData = await backendResponse.json();
+            // Sign in with popup with explicit error handling
+            const result = await firebaseAuth.signInWithPopup(provider);
+            
+            // Get the user from the result
+            const user = result.user;
+            
+            if (user) {
+                // Get the Firebase ID token
+                const idToken = await user.getIdToken(true);
+                
+                // Send this idToken to your backend
+                const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ id_token: idToken }),
+                    credentials: 'include'
+                });
 
-            if (backendResponse.ok) {
-                // Backend එකෙන් token එක ආවට පස්සෙ, email/password login එකේ වගේම handle කරන්න
-                // Google වලින් sign-in වෙනකොට "rememberMe" behavior එක default true දාමු දැනට
-                handleLoginSuccess(backendData, true); 
+                const backendData = await backendResponse.json();
+
+                if (backendResponse.ok) {
+                    // Handle login success like regular login
+                    handleLoginSuccess(backendData, true);
+                } else {
+                    handleApiError(backendData, backendResponse.status);
+                    googleSignInButton.disabled = false;
+                    googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+                    hideLoading();
+                }
             } else {
-                handleApiError(backendData, backendResponse.status);
+                showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
                 googleSignInButton.disabled = false;
                 googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+                hideLoading();
             }
-        } else {
-            showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+        } catch (error) {
+            console.error("Google Sign-In Error:", error);
+            
+            // Handle specific error codes with user-friendly messages
+            let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
+            
+            switch(error.code) {
+                case 'auth/popup-closed-by-user':
+                    displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී.';
+                    break;
+                case 'auth/popup-blocked':
+                    displayMessage = 'බ්‍රවුසරය විසින් පොප්-අප් අවහිර කර ඇත. කරුණාකර ඔබේ බ්‍රවුසරයේ පොප්-අප් අවහිර කිරීම් පරීක්ෂා කරන්න.';
+                    break;
+                case 'auth/cancelled-popup-request':
+                    displayMessage = 'එකවර පිවිසුම් කවුළු කිහිපයක් විවෘත කර ඇත.';
+                    break;
+                case 'auth/network-request-failed':
+                    displayMessage = 'ජාල දෝෂයක්. ඔබගේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කරන්න.';
+                    break;
+                case 'auth/internal-error':
+                    displayMessage = 'අභ්‍යන්තර දෝෂයක්. කරුණාකර පසුව නැවත උත්සාහ කරන්න.';
+                    // Try fallback method if popup fails
+                    tryRedirectAuth();
+                    break;
+                default:
+                    displayMessage += error.message;
+            }
+            
+            showMessage(displayMessage, 'error');
             googleSignInButton.disabled = false;
             googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+            hideLoading();
         }
-
-    } catch (error) {
-        // Handle Errors here.
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        // The email of the user's account used.
-        // const email = error.customData?.email; // Modular SDK
-        const email = error.email; // Compat SDK
-        // The AuthCredential type that was used.
-        // const credential = firebase.auth.GoogleAuthProvider.credentialFromError(error); // Modular SDK
-        // const credential = firebase.auth.GoogleAuthProvider.credentialFromError(error); // Compat SDK
-
-        console.error("Google Sign-In Error:", error);
-        let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
-        if (errorCode === 'auth/popup-closed-by-user') {
-            displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී.';
-        } else if (errorCode === 'auth/cancelled-popup-request') {
-            displayMessage = 'එකවර පිවිසුම් කවුළු කිහිපයක් විවෘත කර ඇත.';
-        } else {
-            displayMessage += errorMessage;
-        }
-        showMessage(displayMessage, 'error');
-        
-        googleSignInButton.disabled = false;
-        googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
     }
-}
+    
+    // Fallback method using redirect instead of popup
+    function tryRedirectAuth() {
+        try {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
+            
+            // Save that we're attempting redirect auth
+            sessionStorage.setItem('auth_redirect_attempt', 'true');
+            
+            // Use redirect method instead
+            firebaseAuth.signInWithRedirect(provider);
+        } catch (error) {
+            console.error("Redirect auth fallback error:", error);
+        }
+    }
+    
+    // Check for redirect result on page load
+    function checkRedirectResult() {
+        if (sessionStorage.getItem('auth_redirect_attempt')) {
+            // Clear the flag
+            sessionStorage.removeItem('auth_redirect_attempt');
+            
+            // Show loading while we check the result
+            showLoading();
+            
+            firebaseAuth.getRedirectResult()
+                .then(async (result) => {
+                    if (result.user) {
+                        // Get the Firebase ID token
+                        const idToken = await result.user.getIdToken(true);
+                        
+                        // Send to backend
+                        const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ id_token: idToken }),
+                            credentials: 'include'
+                        });
 
-// Add Event Listener to Google Sign-In Button
-if (googleSignInButton) {
-    googleSignInButton.addEventListener('click', signInWithGoogle);
-}
+                        const backendData = await backendResponse.json();
+
+                        if (backendResponse.ok) {
+                            handleLoginSuccess(backendData, true);
+                        } else {
+                            handleApiError(backendData, backendResponse.status);
+                            hideLoading();
+                        }
+                    } else {
+                        hideLoading();
+                    }
+                })
+                .catch((error) => {
+                    console.error("Redirect result error:", error);
+                    hideLoading();
+                    showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සාහ කරන්න.', 'error');
+                });
+        }
+    }
+
+    // Add Event Listener to Google Sign-In Button
+    if (googleSignInButton) {
+        googleSignInButton.addEventListener('click', signInWithGoogle);
+    }
 
     // Toggle password visibility
     togglePassword.addEventListener('click', () => {
@@ -354,23 +438,23 @@ if (googleSignInButton) {
         }
     }
     
-    function handleApiError(data, status) {
+    function handleApiError(responseData, status) {
         let errorMessage = 'ඇතුල් වීමට නොහැක. ';
-        if (data?.detail) {
-            if (typeof data.detail === 'string') {
-                if (data.detail.includes('Invalid email or password') || data.detail.includes('INVALID_LOGIN_CREDENTIALS')) {
+        if (responseData?.detail) {
+            if (typeof responseData.detail === 'string') {
+                if (responseData.detail.includes('Invalid email or password') || responseData.detail.includes('INVALID_LOGIN_CREDENTIALS')) {
                     errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
                     showInputError(emailErrorEl, ' '); emailInput.focus();
                     showInputError(passwordErrorEl, ' ');
-                } else if (data.detail.includes('Account temporarily locked')) {
-                    errorMessage = data.detail; // Show lockout message from API
-                } else if (data.detail.includes('Account disabled')) {
+                } else if (responseData.detail.includes('Account temporarily locked')) {
+                    errorMessage = responseData.detail; // Show lockout message from API
+                } else if (responseData.detail.includes('Account disabled')) {
                     errorMessage = 'ඔබගේ ගිණුම අක්‍රිය කර ඇත.';
                 } else {
-                    errorMessage += data.detail;
+                    errorMessage += responseData.detail;
                 }
             } else {
-                errorMessage += JSON.stringify(data.detail);
+                errorMessage += JSON.stringify(responseData.detail);
             }
         } else {
             errorMessage += `සේවාදායකයේ දෝෂයක් (කේතය: \${status})`;
@@ -443,6 +527,9 @@ if (googleSignInButton) {
     
     // Check for redirect after login and verify logged-in state
     document.addEventListener('DOMContentLoaded', function() {
+        // Check for any Firebase auth redirect results
+        checkRedirectResult();
+        
         // First check if user is already logged in, redirect to dashboard
         const authToken = sessionStorage.getItem('auth_token');
         if (authToken) {
@@ -476,6 +563,15 @@ if (googleSignInButton) {
             });
         }
     });
+    
+    // Show or hide loading indicator
+    function showLoading() {
+        document.getElementById('loadingIndicator').style.display = 'flex';
+    }
+    
+    function hideLoading() {
+        document.getElementById('loadingIndicator').style.display = 'none';
+    }
 </script>
 HTML;
 

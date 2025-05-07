@@ -66,32 +66,44 @@ if (isset($description)) {
         }
     </script>
 
+<!-- Firebase initialization -->
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
 
 <script>
   // Your web app's Firebase configuration
-  // !! මේ ටික ඔයාගෙ Firebase Project Settings වලින් ගන්න ඕන !!
   const firebaseConfig = {
-    apiKey: "AIzaSyCJFdKtU5AGhDpsTvhWCXh8AaoQ8M4Frt4", // ඔයාගෙ config.py එකේ FIREBASE_WEB_API_KEY එක
-    authDomain: "kdj-lanka.firebaseapp.com",
-    projectId: "kdj-lanka",
-    storageBucket: "kdj-lanka.appspot.com",
-    messagingSenderId: "812675960947",
-    appId: "1:812675960947:web:bc57a1d19da73b9ac51a06"
+    apiKey: "AIzaSyCJFdKtU5AGhDpsTvhWCXh8AaoQ8M4Frt4",
+  authDomain: "kdj-lanka.firebaseapp.com",
+  databaseURL: "https://kdj-lanka-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kdj-lanka",
+  storageBucket: "kdj-lanka.appspot.com",
+  messagingSenderId: "812675960947",
+  appId: "1:812675960947:web:bc57a1d19da73b9ac51a06",
+  measurementId: "G-GGFCJZXE9T"
   };
 
   // Initialize Firebase
   let firebaseApp;
   let firebaseAuth;
+  
   try {
+    // Initialize Firebase with config
     firebaseApp = firebase.initializeApp(firebaseConfig);
-    firebaseAuth = firebase.auth(); // compat version
+    firebaseAuth = firebase.auth(firebaseApp);
+    
+    // Set persistence to session (clears when window/tab closes)
+    firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+      .then(() => {
+        console.log("Firebase Auth Persistence set to SESSION");
+      })
+      .catch((error) => {
+        console.error("Error setting auth persistence:", error);
+      });
+      
     console.log("Firebase Initialized Successfully!");
   } catch (e) {
     console.error("Error initializing Firebase:", e);
-    // මෙතන user ට message එකක් පෙන්නන්නත් පුළුවන් Firebase load වුනේ නැත්නම්.
-    showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. කරුණාකර පසුව උත්සහ කරන්න.', 'error');
   }
 </script>
     
