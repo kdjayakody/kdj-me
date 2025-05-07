@@ -373,473 +373,205 @@ $additional_scripts = <<<HTML
             handleNetworkError(error);
             enableSubmitButton();
         }
-    });// Configuration
-const apiBaseUrl = '<?php echo $apiBaseUrl; ?>'; // PHP variable should be correctly injected
-const REDIRECT_URL = 'dashboard.php';
-
-// DOM Elements (මේ ටික ඔයාගේ code එකේ දැනටමත් ඇති)
-const loginForm = document.getElementById('loginForm');
-const emailInput = document.getElementById('email');
-const passwordInput = document.getElementById('password');
-const rememberMeInput = document.getElementById('remember_me');
-const messageArea = document.getElementById('messageArea');
-const submitButton = document.getElementById('submitButton');
-const togglePassword = document.getElementById('togglePassword');
-const buttonText = document.getElementById('buttonText'); // Make sure this element exists or adjust
-const emailErrorEl = document.getElementById('emailError');
-const passwordErrorEl = document.getElementById('passwordError');
-const googleSignInButton = document.getElementById('googleSignInButton');
-
-// Helper Functions (මේවා ඔයාගේ original script එකේ තිබ්බා වගේම තියාගන්න, නැත්නම් අලුතින් දාන්න)
-function isValidEmail(email) {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(String(email).toLowerCase());
-}
-
-function showInputError(element, message) {
-    if (!element) return;
-    element.textContent = message;
-    element.style.display = 'block';
-    const inputField = element.closest('div')?.querySelector('input[type="email"], input[type="password"]');
-    if (inputField) {
-        inputField.classList.add('border-red-500');
-        inputField.classList.remove('focus:border-kdj-red','focus:ring-kdj-red');
-        inputField.classList.add('focus:border-red-500','focus:ring-red-500');
-    }
-}
-
-function clearMessages() {
-    if (messageArea) {
-        messageArea.style.display = 'none';
-        messageArea.textContent = '';
-        messageArea.className = 'my-6 p-3 rounded-md text-center font-medium text-sm hidden'; // Reset classes
-    }
-    if (emailErrorEl) emailErrorEl.style.display = 'none';
-    if (passwordErrorEl) passwordErrorEl.style.display = 'none';
-
-    [emailInput, passwordInput].forEach(input => {
-        if (input) {
-            input.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
-            input.classList.add('focus:border-kdj-red', 'focus:ring-kdj-red');
-        }
     });
-}
-
-function showMessage(msg, type) {
-    if (!messageArea) return;
-    messageArea.textContent = msg;
-    let typeClasses = 'border ';
-    if (type === 'success') {
-        typeClasses += 'bg-green-50 border-green-300 text-green-700';
-    } else if (type === 'error') {
-        typeClasses += 'bg-red-50 border-red-300 text-red-700';
-    } else {
-        typeClasses += 'bg-blue-50 border-blue-300 text-blue-700';
+    
+    // Helper Functions
+    function validateInputs(email, password) {
+        let isValid = true;
+        clearMessages(); // Clear previous errors first
+        
+        if (!email) {
+            showInputError(emailErrorEl, 'ඊමේල් ලිපිනය අවශ්‍යයි.');
+            isValid = false;
+        } else if (!isValidEmail(email)) {
+            showInputError(emailErrorEl, 'කරුණාකර වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.');
+            isValid = false;
+        }
+        
+        if (!password) {
+            showInputError(passwordErrorEl, 'මුරපදය අවශ්‍යයි.');
+            isValid = false;
+        }
+        return isValid;
     }
-    messageArea.className = `my-6 p-3 rounded-md text-center font-medium text-sm \${typeClasses}`; // Ensure this is correct
-    messageArea.style.display = 'block';
-}
-
-
-function disableSubmitButton(text = 'සකසමින්...') {
-    if (!submitButton) return;
-    submitButton.disabled = true;
-    // Ensure buttonText element exists or handle submitButton's content directly
-    const btnTextSpan = submitButton.querySelector('#buttonText') || submitButton.querySelector('span');
-    if (btnTextSpan) {
-        btnTextSpan.textContent = text;
-    } else {
-        submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i><span>\${text}</span>`; // Fallback
+    
+    function handleLoginSuccess(data, rememberMe) {
+        showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
+        handleTokenStorage(data, rememberMe);
+        
+        // Redirect based on MFA status
+        const redirectTarget = (data.mfa_required && data.mfa_methods?.length > 0)
+            ? `mfa.php?methods=\${data.mfa_methods.join(',')}` // MFA page
+            : REDIRECT_URL; // Dashboard
+        
+        setTimeout(() => { window.location.href = redirectTarget; }, 1000);
     }
-    if (!submitButton.querySelector('.fa-spinner')) { // Avoid adding multiple spinners
-         submitButton.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
-    }
-}
-
-function enableSubmitButton(text = 'ඇතුල් වන්න') {
-    if (!submitButton) return;
-    submitButton.disabled = false;
-    const spinnerIcon = submitButton.querySelector('.fa-spinner');
-    if (spinnerIcon) spinnerIcon.remove();
-    const btnTextSpan = submitButton.querySelector('#buttonText') || submitButton.querySelector('span');
-    if (btnTextSpan) {
-        btnTextSpan.textContent = text;
-    } else {
-         submitButton.innerHTML = `<span>\${text}</span>`; // Fallback
-    }
-}
-
-function handleTokenStorage(data, rememberMe) {
-    const storage = rememberMe ? localStorage : sessionStorage;
-    const otherStorage = rememberMe ? sessionStorage : localStorage;
-
-    if (data.access_token) {
-        sessionStorage.setItem('auth_token', data.access_token);
-        if (data.expires_in) {
-            const expiryTime = Date.now() + (data.expires_in * 1000);
-            sessionStorage.setItem('token_expiry', expiryTime.toString());
+    
+    function handleTokenStorage(data, rememberMe) {
+        const storage = rememberMe ? localStorage : sessionStorage;
+        const otherStorage = rememberMe ? sessionStorage : localStorage; // For clearing opposite storage
+        
+        if (data.access_token) {
+            sessionStorage.setItem('auth_token', data.access_token); // Access token always in session storage
+            if (data.expires_in) {
+                const expiryTime = Date.now() + (data.expires_in * 1000);
+                sessionStorage.setItem('token_expiry', expiryTime.toString());
+            }
+        }
+        
+        if (data.refresh_token) {
+            storage.setItem('refresh_token', data.refresh_token); // Store refresh token based on rememberMe
+            otherStorage.removeItem('refresh_token'); // Clear from the other storage
+        } else {
+            // Ensure refresh token is cleared if not provided
+            localStorage.removeItem('refresh_token');
+            sessionStorage.removeItem('refresh_token');
+        }
+        
+        if (data.user_id) {
+            storage.setItem('user_id', data.user_id);
+            otherStorage.removeItem('user_id');
+        } else {
+            // Ensure user ID is cleared if not provided
+            localStorage.removeItem('user_id');
+            sessionStorage.removeItem('user_id');
         }
     }
-
-    if (data.refresh_token) {
-        storage.setItem('refresh_token', data.refresh_token);
-        otherStorage.removeItem('refresh_token');
-    } else {
-        localStorage.removeItem('refresh_token');
-        sessionStorage.removeItem('refresh_token');
-    }
-
-    if (data.user_id) { // Assuming user_id might come from login response
-        storage.setItem('user_id', data.user_id);
-        otherStorage.removeItem('user_id');
-    } else {
-        localStorage.removeItem('user_id');
-        sessionStorage.removeItem('user_id');
-    }
-}
-
-function handleApiError(responseData, status) {
-    let errorMessage = 'ඇතුල් වීමට නොහැක. ';
-    if (responseData?.detail) {
-        if (typeof responseData.detail === 'string') {
-            if (responseData.detail.includes('Invalid email or password') || responseData.detail.includes('INVALID_LOGIN_CREDENTIALS')) {
-                errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
-                if (emailInput && passwordInput) { // Ensure elements exist
+    
+    function handleApiError(responseData, status) {
+        let errorMessage = 'ඇතුල් වීමට නොහැක. ';
+        if (responseData?.detail) {
+            if (typeof responseData.detail === 'string') {
+                if (responseData.detail.includes('Invalid email or password') || responseData.detail.includes('INVALID_LOGIN_CREDENTIALS')) {
+                    errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
                     showInputError(emailErrorEl, ' '); emailInput.focus();
                     showInputError(passwordErrorEl, ' ');
+                } else if (responseData.detail.includes('Account temporarily locked')) {
+                    errorMessage = responseData.detail; // Show lockout message from API
+                } else if (responseData.detail.includes('Account disabled')) {
+                    errorMessage = 'ඔබගේ ගිණුම අක්‍රිය කර ඇත.';
+                } else {
+                    errorMessage += responseData.detail;
                 }
-            } else if (responseData.detail.includes('Account temporarily locked')) {
-                errorMessage = responseData.detail;
-            } else if (responseData.detail.includes('Account disabled')) {
-                errorMessage = 'ඔබගේ ගිණුම අක්‍රිය කර ඇත.';
             } else {
-                errorMessage += responseData.detail;
+                errorMessage += JSON.stringify(responseData.detail);
             }
         } else {
-            errorMessage += JSON.stringify(responseData.detail);
+            errorMessage += `සේවාදායකයේ දෝෂයක් (කේතය: \${status})`;
         }
-    } else {
-        errorMessage += `සේවාදායකයේ දෝෂයක් (කේතය: \${status})`;
+        showMessage(errorMessage, 'error');
     }
-    showMessage(errorMessage, 'error');
-}
-
-function handleNetworkError(error) {
-    console.error('Login Fetch Error:', error);
-    showMessage('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සහ කරන්න.', 'error');
-}
-
-// --- අලුතින් වෙනස් වන handleLoginSuccess function එක ---
-function handleLoginSuccess(data, rememberMe) {
-    showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
-    handleTokenStorage(data, rememberMe);
-
-    let determinedRedirectUrl = '';
-    const loginReferrer = sessionStorage.getItem('loginReferrer');
-    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin'); // Set by utils.js/footer.php for protected pages
-
-    if (loginReferrer) {
-        determinedRedirectUrl = loginReferrer;
-        sessionStorage.removeItem('loginReferrer');
-        if (redirectAfterLogin) { // loginReferrer takes precedence
-            sessionStorage.removeItem('redirectAfterLogin');
+    
+    function handleNetworkError(error) {
+        console.error('Login Fetch Error:', error);
+        showMessage('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සහ කරන්න.', 'error');
+    }
+    
+    function showMessage(msg, type) {
+        messageArea.textContent = msg;
+        // Base classes + type specific classes
+        let typeClasses = 'border ';
+        if (type === 'success') {
+            typeClasses += 'bg-green-50 border-green-300 text-green-700';
+        } else if (type === 'error') {
+            typeClasses += 'bg-red-50 border-red-300 text-red-700';
+        } else { // Info or default
+            typeClasses += 'bg-blue-50 border-blue-300 text-blue-700';
         }
-    } else if (redirectAfterLogin) {
-        determinedRedirectUrl = redirectAfterLogin;
-        sessionStorage.removeItem('redirectAfterLogin');
+        messageArea.className = `my-6 p-3 rounded-md text-center font-medium text-sm \${typeClasses}`;
+        messageArea.style.display = 'block';
     }
-
-    let finalRedirectTarget;
-    // Check MFA status from the login response (data.mfa_required, data.mfa_methods)
-    if (data.mfa_required && data.mfa_methods?.length > 0) {
-        const mfaRedirectParams = new URLSearchParams();
-        if (determinedRedirectUrl) {
-            mfaRedirectParams.set('next', determinedRedirectUrl);
-        } else {
-            mfaRedirectParams.set('next', REDIRECT_URL); // Default dashboard after MFA
+    
+    function showInputError(element, message) {
+        if (!element) return;
+        element.textContent = message;
+        element.style.display = 'block';
+        const input = element.closest('div')?.querySelector('input'); // Find input in parent div
+        if (input) {
+            input.classList.add('border-red-500'); // Add red border
+            input.classList.remove('focus:border-kdj-red','focus:ring-kdj-red'); // Remove default focus
+            input.classList.add('focus:border-red-500','focus:ring-red-500'); // Add red focus
         }
-        finalRedirectTarget = `mfa.php?methods=\${data.mfa_methods.join(',')}&\${mfaRedirectParams.toString()}`;
-    } else {
-        finalRedirectTarget = determinedRedirectUrl || REDIRECT_URL; // Use determined URL or dashboard
     }
-
-    setTimeout(() => { window.location.href = finalRedirectTarget; }, 1000);
-}
-
-
-// --- Google Sign-In ---
-async function signInWithGoogle() {
-    if (!firebaseAuth) { // firebaseAuth `header.php` එකෙන් එන්න ඕන
-        showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. Firebase සූදානම් නැත.', 'error');
-        return;
+    
+    function clearMessages() {
+        messageArea.style.display = 'none';
+        messageArea.textContent = '';
+        if (emailErrorEl) emailErrorEl.style.display = 'none';
+        if (passwordErrorEl) passwordErrorEl.style.display = 'none';
+        
+        // Remove red borders and restore default focus
+        [emailInput, passwordInput].forEach(input => {
+            input?.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            input?.classList.add('focus:border-kdj-red', 'focus:ring-kdj-red');
+        });
     }
-
-    clearMessages();
-    if (googleSignInButton) {
-        googleSignInButton.disabled = true;
-        const span = googleSignInButton.querySelector('span');
-        if(span) span.textContent = 'සකසමින්...';
+    
+    function disableSubmitButton(text) {
+        submitButton.disabled = true;
+        buttonText.textContent = text;
+        // Add spinner using font awesome
+        submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i><span>\${text}</span>`;
     }
-    if (typeof showLoading === 'function') showLoading(); // Global showLoading from footer.php
-
-    try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        provider.addScope('email');
-        provider.addScope('profile');
-        provider.setCustomParameters({ prompt: 'select_account' });
-
-        const result = await firebaseAuth.signInWithPopup(provider);
-        const user = result.user;
-
-        if (user) {
-            const idToken = await user.getIdToken(true);
-            const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', },
-                body: JSON.stringify({ id_token: idToken }),
-                credentials: 'include' // Important for cookies if your backend sets them
-            });
-
-            const backendData = await backendResponse.json();
-
-            if (backendResponse.ok) {
-                handleLoginSuccess(backendData, true); // Assume 'rememberMe' for Google Sign-In
-            } else {
-                handleApiError(backendData, backendResponse.status);
-                if (googleSignInButton) {
-                    googleSignInButton.disabled = false;
-                    const span = googleSignInButton.querySelector('span');
-                    if(span) span.textContent = 'Google සමඟින් පිවිසෙන්න';
-                }
-                if (typeof hideLoading === 'function') hideLoading();
-            }
-        } else {
-            throw new Error('Google sign-in did not return a user.');
-        }
-    } catch (error) {
-        console.error("Google Sign-In Error:", error);
-        let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
-        if (error.code) {
-            switch(error.code) {
-                case 'auth/popup-closed-by-user': displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී.'; break;
-                case 'auth/popup-blocked': displayMessage = 'බ්‍රවුසරය විසින් පොප්-අප් අවහිර කර ඇත.'; break;
-                // Add other specific Firebase error codes if needed
-                default: displayMessage += error.message;
-            }
-        } else {
-             displayMessage += error.message;
-        }
-        showMessage(displayMessage, 'error');
-        if (googleSignInButton) {
-            googleSignInButton.disabled = false;
-            const span = googleSignInButton.querySelector('span');
-            if(span) span.textContent = 'Google සමඟින් පිවිසෙන්න';
-        }
-        if (typeof hideLoading === 'function') hideLoading();
+    
+    function enableSubmitButton() {
+        submitButton.disabled = false;
+        // Restore original button text/structure
+        submitButton.innerHTML = `<span id="buttonText">ඇතුල් වන්න</span>`;
     }
-}
-
-// Fallback for Google Sign-In (tryRedirectAuth) - this should be defined if used
-function tryRedirectAuth() {
-    // This function's implementation would be similar to what was in your original file if you used it.
-    // For now, we are focusing on popup. If redirect is needed, ensure it's correctly implemented.
-    console.log("Redirect auth fallback triggered but not fully implemented in this snippet.");
-     try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        provider.addScope('email');
-        provider.addScope('profile');
-        sessionStorage.setItem('auth_redirect_attempt', 'true');
-        firebaseAuth.signInWithRedirect(provider);
-    } catch (error) {
-        console.error("Redirect auth fallback error:", error);
-        showMessage('Google පිවිසුම් redirect එක සකස් කිරීමට නොහැකි විය.', 'error');
+    
+    function isValidEmail(email) {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return re.test(String(email).toLowerCase());
     }
-}
-
-// Check for Google Sign-In redirect result
-function checkRedirectResult() {
-    if (sessionStorage.getItem('auth_redirect_attempt') && firebaseAuth) {
-        sessionStorage.removeItem('auth_redirect_attempt');
-        if (typeof showLoading === 'function') showLoading();
-
-        firebaseAuth.getRedirectResult()
-            .then(async (result) => {
-                if (typeof hideLoading === 'function') hideLoading();
-                if (result.user) {
-                    const idToken = await result.user.getIdToken(true);
-                    const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', },
-                        body: JSON.stringify({ id_token: idToken }),
-                        credentials: 'include'
-                    });
-                    const backendData = await backendResponse.json();
-                    if (backendResponse.ok) {
-                        handleLoginSuccess(backendData, true);
+    
+    // Check for redirect after login and verify logged-in state
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check for any Firebase auth redirect results
+        checkRedirectResult();
+        
+        // First check if user is already logged in, redirect to dashboard
+        const authToken = sessionStorage.getItem('auth_token');
+        if (authToken) {
+            // Verify token is valid
+            fetch(`\${apiBaseUrl}/users/me`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer \${authToken}`
+                },
+                credentials: 'include'
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Check if there's a specific redirect URL in sessionStorage
+                    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                    
+                    if (redirectAfterLogin) {
+                        // User is logged in, redirect to the saved URL
+                        sessionStorage.removeItem('redirectAfterLogin');
+                        window.location.href = redirectAfterLogin;
                     } else {
-                        handleApiError(backendData, backendResponse.status);
+                        // No saved redirect, go to dashboard
+                        window.location.href = REDIRECT_URL;
                     }
                 }
             })
-            .catch((error) => {
-                if (typeof hideLoading === 'function') hideLoading();
-                console.error("Redirect result error:", error);
-                // Don't show generic error if it's just no redirect result (e.g. user refreshed)
-                if (error.code !== 'auth/no-redirect-operation') {
-                     showMessage('Google පිවිසුම් redirect එකේදී දෝෂයක් ඇතිවිය.', 'error');
-                }
+            .catch(error => {
+                console.error('Auth check error:', error);
+                // Token may be invalid, let user login again
             });
-    }
-}
-
-
-document.addEventListener('DOMContentLoaded', function() {
-    // 1. CAPTURE EXTERNAL KDJ REFERRER (NEW)
-    const referrer = document.referrer;
-    const currentLoginHost = window.location.hostname;
-    if (referrer) {
-        try {
-            const referrerUrl = new URL(referrer);
-            const referrerHost = referrerUrl.hostname;
-            if (referrerHost.endsWith('kdj.lk') && referrerHost !== currentLoginHost) {
-                const authPathsOnOtherDomains = ['/index.php', '/login', '/signin', '/register.php', '/forgot_password.php'];
-                let isAuthPathReferrer = authPathsOnOtherDomains.some(p => referrerUrl.pathname.toLowerCase().includes(p.toLowerCase()));
-                if (!isAuthPathReferrer) {
-                    sessionStorage.setItem('loginReferrer', referrer);
-                }
-            }
-        } catch (e) {
-            console.warn("Referrer URL එක parse කරන්න බැරි වුණා:", referrer, e);
         }
+    });
+    
+    // Show or hide loading indicator
+    function showLoading() {
+        document.getElementById('loadingIndicator').style.display = 'flex';
     }
-
-    // 2. CHECK FOR FIREBASE REDIRECT RESULT
-    if (typeof firebaseAuth !== 'undefined') { // Ensure firebaseAuth is initialized
-       checkRedirectResult();
+    
+    function hideLoading() {
+        document.getElementById('loadingIndicator').style.display = 'none';
     }
-
-
-    // 3. HANDLE ALREADY LOGGED-IN USER (EXISTING MODIFIED)
-    const authToken = sessionStorage.getItem('auth_token');
-    if (authToken) {
-        // footer.php එකේ checkUserAuth() function එක මේ වගේ දෙයක් කරනවා.
-        // හැබැයි ඒක protected pages වලට. index.php එකට ආවොත් මේකෙන් handle වෙන්න ඕන.
-        if (typeof showLoading === 'function') showLoading();
-        fetch(`\${apiBaseUrl}/users/me`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json', 'Authorization': `Bearer \${authToken}` },
-            credentials: 'include'
-        })
-        .then(response => response.json().then(data => ({ok: response.ok, status: response.status, body: data})))
-        .then(result => {
-            if (typeof hideLoading === 'function') hideLoading();
-            if (result.ok && result.body) {
-                let loggedInRedirectTarget = '';
-                const loginReferrer = sessionStorage.getItem('loginReferrer');
-                const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-
-                if (loginReferrer) {
-                    loggedInRedirectTarget = loginReferrer;
-                    sessionStorage.removeItem('loginReferrer');
-                    if (redirectAfterLogin) sessionStorage.removeItem('redirectAfterLogin');
-                } else if (redirectAfterLogin) {
-                    loggedInRedirectTarget = redirectAfterLogin;
-                    sessionStorage.removeItem('redirectAfterLogin');
-                } else {
-                    if (result.body.mfa_required && result.body.mfa_methods?.length > 0) {
-                        const mfaRedirectParams = new URLSearchParams();
-                        mfaRedirectParams.set('next', REDIRECT_URL);
-                        loggedInRedirectTarget = `mfa.php?methods=\${result.body.mfa_methods.join(',')}&\${mfaRedirectParams.toString()}`;
-                    } else {
-                        loggedInRedirectTarget = REDIRECT_URL;
-                    }
-                }
-                window.location.href = loggedInRedirectTarget;
-            } else {
-                 sessionStorage.removeItem('auth_token');
-                 sessionStorage.removeItem('token_expiry');
-                 localStorage.removeItem('refresh_token'); // As per footer.php logout
-                 sessionStorage.removeItem('refresh_token');
-            }
-        })
-        .catch(error => {
-            if (typeof hideLoading === 'function') hideLoading();
-            console.error('Auth check error for already logged-in user:', error);
-            sessionStorage.removeItem('auth_token');
-            sessionStorage.removeItem('token_expiry');
-            localStorage.removeItem('refresh_token');
-            sessionStorage.removeItem('refresh_token');
-        });
-    }
-
-
-    // Event Listeners
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            clearMessages();
-            disableSubmitButton('සකසමින්...');
-
-            const email = emailInput.value.trim();
-            const password = passwordInput.value;
-            const rememberMe = rememberMeInput.checked;
-
-            let isValid = true;
-            if (!email) {
-                showInputError(emailErrorEl, 'ඊමේල් ලිපිනය අවශ්‍යයි.'); isValid = false;
-            } else if (!isValidEmail(email)) {
-                showInputError(emailErrorEl, 'කරුණාකර වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.'); isValid = false;
-            }
-            if (!password) {
-                showInputError(passwordErrorEl, 'මුරපදය අවශ්‍යයි.'); isValid = false;
-            }
-
-            if (!isValid) {
-                enableSubmitButton('ඇතුල් වන්න');
-                return;
-            }
-
-            if (typeof showLoading === 'function') showLoading(); // Global showLoading
-            try {
-                const response = await fetch(`\${apiBaseUrl}/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', },
-                    body: JSON.stringify({ email, password, remember_me: rememberMe }),
-                    credentials: 'include'
-                });
-                const data = await response.json();
-                if (typeof hideLoading === 'function') hideLoading();
-
-                if (response.ok) {
-                    handleLoginSuccess(data, rememberMe);
-                } else {
-                    handleApiError(data, response.status);
-                    enableSubmitButton('ඇතුල් වන්න');
-                }
-            } catch (error) {
-                if (typeof hideLoading === 'function') hideLoading();
-                handleNetworkError(error);
-                enableSubmitButton('ඇතුල් වන්න');
-            }
-        });
-    }
-
-    if (togglePassword && passwordInput) {
-        togglePassword.addEventListener('click', () => {
-            const type = passwordInput.type === 'password' ? 'text' : 'password';
-            passwordInput.type = type;
-            const icon = togglePassword.querySelector('i');
-            if (icon) {
-                icon.classList.toggle('fa-eye');
-                icon.classList.toggle('fa-eye-slash');
-            }
-        });
-    }
-
-    if (googleSignInButton && typeof firebaseAuth !== 'undefined') {
-        googleSignInButton.addEventListener('click', signInWithGoogle);
-    }
-});
 </script>
 HTML;
 
