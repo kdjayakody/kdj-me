@@ -116,6 +116,7 @@ if (isset($description)) {
     <!-- Custom CSS -->
     <style>
         body {
+        display: none;
             font-family: 'Nunito', sans-serif;
         }
         
@@ -143,11 +144,37 @@ if (isset($description)) {
         ::-webkit-scrollbar-thumb:hover {
             background: #a41a1f;
         }
-    </style>
+
+    /* Public pages explicitly show the body */
+    body.public-page {
+        display: block;
+        font-family: 'Nunito', sans-serif;
+
+    }
+</style>
     
     <?php if (isset($additional_head)) echo $additional_head; ?>
 </head>
 <body class="bg-gray-100 min-h-screen">
+<script>
+    // Immediate auth check for protected pages (before DOM content loads)
+    (function() {
+        const protectedPages = ['dashboard.php', 'profile.php', 'settings.php', 'security.php'];
+        const currentPage = window.location.pathname.split('/').pop() || 'index.php';
+        
+        if (protectedPages.includes(currentPage)) {
+            const authToken = sessionStorage.getItem('auth_token');
+            if (!authToken) {
+                console.log("No auth token found, redirecting to login (early check)");
+                sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                window.location.href = '/index.php';
+            }
+        } else {
+            // Mark non-protected pages as public
+            document.body.classList.add('public-page');
+        }
+    })();
+</script>
     <!-- Loading Indicator -->
     <div id="loadingIndicator" class="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-white bg-opacity-80 z-50" style="display: none;">
         <div class="loader h-16 w-16 border-4 border-gray-200 rounded-full"></div>
