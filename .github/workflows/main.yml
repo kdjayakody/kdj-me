@@ -143,6 +143,7 @@ jobs:
               --exclude='data/uploads' \
               --exclude='data/cache' \
               --exclude='.htaccess' \
+              --exclude='.user.ini' \
               --exclude='config.php' \
               deploy/ $SERVER_USER@$SERVER_IP:$SERVER_PATH/
         
