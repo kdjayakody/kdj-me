@@ -553,8 +553,19 @@ $additional_scripts = <<<HTML
         return re.test(String(email).toLowerCase());
     }
     
-    // Check for redirect after login and verify logged-in state
+    // Save referrer information for redirecting back after login
     document.addEventListener('DOMContentLoaded', function() {
+        // Check referrer to see if it's from an internal site we should redirect back to
+        const referrer = document.referrer;
+        
+        if (referrer && (
+            referrer.includes('events.kdj.lk') || 
+            referrer.includes('singlish.kdj.lk')
+        )) {
+            // If referred from one of our other sites, store it for redirect after login
+            sessionStorage.setItem('redirectAfterLogin', referrer);
+        }
+        
         // Check for any Firebase auth redirect results
         checkRedirectResult();
         
