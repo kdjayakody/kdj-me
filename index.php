@@ -120,7 +120,7 @@ include 'header.php';
                     </div>
                     <input type="password" id="password" name="password" required
                         class="form-input flex-grow block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 pr-10 focus:border-kdj-red focus:ring-kdj-red sm:text-sm"> 
-                    <span class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-gray-700 hover:text-gray-900 password-toggle">
+                    <span class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-gray-700 hover:text-gray-900" id="togglePassword">
                         <i class="fas fa-eye text-sm"></i>
                     </span>
                 </div>
@@ -182,10 +182,20 @@ $additional_scripts = <<<HTML
     const rememberMeInput = document.getElementById('remember_me');
     const messageArea = document.getElementById('messageArea');
     const submitButton = document.getElementById('submitButton');
+    const togglePassword = document.getElementById('togglePassword');
     const buttonText = document.getElementById('buttonText');
     const emailErrorEl = document.getElementById('emailError');
     const passwordErrorEl = document.getElementById('passwordError');
     const googleSignInButton = document.getElementById('googleSignInButton');
+    
+    // Toggle password visibility
+    togglePassword.addEventListener('click', () => {
+        const type = passwordInput.type === 'password' ? 'text' : 'password';
+        passwordInput.type = type;
+        const icon = togglePassword.querySelector('i');
+        icon.classList.toggle('fa-eye');
+        icon.classList.toggle('fa-eye-slash');
+    });
     
     // Check if there's a redirect URL in the query parameters
     function checkForRedirectInURL() {
@@ -201,48 +211,9 @@ $additional_scripts = <<<HTML
     // Run it when page loads
     checkForRedirectInURL();
     
-    // Check referrer for internal services
-    function checkReferrer() {
-        const referrer = document.referrer;
-        
-        if (referrer && (
-            referrer.includes('events.kdj.lk') || 
-            referrer.includes('singlish.kdj.lk')
-        )) {
-            // If referred from one of our other sites, store it for redirect after login
-            sessionStorage.setItem('redirectAfterLogin', referrer);
-        }
-    }
-    
-    // Check for FirebaseAuth redirect results
-    function checkRedirectResult() {
-        if (sessionStorage.getItem('auth_redirect_attempt')) {
-            // Clear the flag
-            sessionStorage.removeItem('auth_redirect_attempt');
-            
-            // Show loading while we check the result
-            showLoading();
-            
-            firebaseAuth.getRedirectResult()
-                .then(async (result) => {
-                    hideLoading();
-                    if (result.user) {
-                        // Get the Firebase ID token
-                        const idToken = await result.user.getIdToken(true);
-                        handleGoogleLoginWithToken(idToken);
-                    }
-                })
-                .catch((error) => {
-                    hideLoading();
-                    console.error("Redirect result error:", error);
-                    showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
-                });
-        }
-    }
-
-    // Google Sign-In Handler
+    // Google Sign-In Handler with improved error handling
     async function signInWithGoogle() {
-        if (!firebaseAuth) {
+        if (!firebaseApp || !firebaseAuth) {
             showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. Firebase සූදානම් නැත.', 'error');
             return;
         }
@@ -259,64 +230,114 @@ $additional_scripts = <<<HTML
             provider.addScope('email');
             provider.addScope('profile');
             
-            // Set custom parameters for the Google provider
-            provider.setCustomParameters({
-                prompt: 'select_account',
-                auth_domain: 'kdj-lanka.firebaseapp.com'
-            });
-
+            // Set longer timeout for operations
+            const authSettings = {
+                appVerificationDisabledForTesting: false,
+                // Set a longer timeout (Firebase default is typically 60 seconds)
+                timeout: 90000
+            };
+            
+            // Apply settings
+            firebaseAuth.settings.appVerificationDisabledForTesting = false;
+            
             // Sign in with popup with explicit error handling
-            const result = await firebaseAuth.signInWithPopup(provider);
-            
-            // Get the user from the result
-            const user = result.user;
-            
-            if (user) {
-                // Get the Firebase ID token
-                const idToken = await user.getIdToken(true);
-                handleGoogleLoginWithToken(idToken);
-            } else {
-                showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
-                googleSignInButton.disabled = false;
-                googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
-                hideLoading();
+            try {
+                const result = await firebaseAuth.signInWithPopup(provider);
+                
+                // Get the user from the result
+                const user = result.user;
+                
+                if (user) {
+                    // Get the Firebase ID token
+                    const idToken = await user.getIdToken(true);
+                    handleGoogleLoginWithToken(idToken);
+                } else {
+                    showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+                    resetGoogleButton();
+                }
+            } catch (popupError) {
+                console.error("Google Sign-In Popup Error:", popupError);
+                
+                // If popup fails, try redirect method
+                if (popupError.code === 'auth/internal-error' || 
+                    popupError.code === 'auth/popup-blocked' || 
+                    popupError.code === 'auth/popup-closed-by-user') {
+                    
+                    showMessage('ප්‍රතිදිශාගත කිරීම් ක්‍රමය උත්සාහ කරමින්...', 'info');
+                    
+                    // Save that we're attempting redirect auth
+                    sessionStorage.setItem('auth_redirect_attempt', 'true');
+                    
+                    // Use redirect method instead
+                    try {
+                        await firebaseAuth.signInWithRedirect(provider);
+                    } catch (redirectError) {
+                        console.error("Redirect auth fallback error:", redirectError);
+                        showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. තාක්ෂණික දෝෂයක්: ' + 
+                                  redirectError.message, 'error');
+                        resetGoogleButton();
+                    }
+                } else {
+                    // Handle other error types
+                    handleGoogleSignInError(popupError);
+                }
             }
         } catch (error) {
-            console.error("Google Sign-In Error:", error);
-            
-            // Handle specific error codes with user-friendly messages
-            let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
-            
-            switch(error.code) {
-                case 'auth/popup-closed-by-user':
-                    displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී.';
-                    break;
-                case 'auth/popup-blocked':
-                    displayMessage = 'බ්‍රවුසරය විසින් පොප්-අප් අවහිර කර ඇත. කරුණාකර ඔබේ බ්‍රවුසරයේ පොප්-අප් අවහිර කිරීම් පරීක්ෂා කරන්න.';
-                    break;
-                case 'auth/cancelled-popup-request':
-                    displayMessage = 'එකවර පිවිසුම් කවුළු කිහිපයක් විවෘත කර ඇත.';
-                    break;
-                case 'auth/network-request-failed':
-                    displayMessage = 'ජාල දෝෂයක්. ඔබගේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කරන්න.';
-                    break;
-                case 'auth/internal-error':
-                    displayMessage = 'අභ්‍යන්තර දෝෂයක්. කරුණාකර පසුව නැවත උත්සාහ කරන්න.';
-                    // Try fallback method if popup fails
-                    tryRedirectAuth();
-                    break;
-                default:
-                    displayMessage += error.message;
-            }
-            
-            showMessage(displayMessage, 'error');
-            googleSignInButton.disabled = false;
-            googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
-            hideLoading();
+            console.error("Google Sign-In Main Error:", error);
+            handleGoogleSignInError(error);
         }
     }
     
-    // Send the Google ID token to backend
+    // Handle Google Sign-In errors with better user feedback
+    function handleGoogleSignInError(error) {
+        let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
+        
+        switch(error.code) {
+            case 'auth/popup-closed-by-user':
+                displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී. කරුණාකර නැවත උත්සාහ කරන්න.';
+                break;
+            case 'auth/popup-blocked':
+                displayMessage = 'බ්‍රවුසරය විසින් පොප්-අප් අවහිර කර ඇත. කරුණාකර ඔබේ බ්‍රවුසරයේ පොප්-අප් අවහිර කිරීම් අක්‍රිය කර නැවත උත්සාහ කරන්න.';
+                break;
+            case 'auth/cancelled-popup-request':
+                displayMessage = 'එකවර පිවිසුම් කවුළු කිහිපයක් විවෘත කර ඇත.';
+                break;
+            case 'auth/network-request-failed':
+                displayMessage = 'ජාල දෝෂයක්. ඔබගේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කරන්න.';
+                break;
+            case 'auth/internal-error':
+                displayMessage = 'අභ්‍යන්තර දෝෂයක්. කරුණාකර පසුව නැවත උත්සාහ කරන්න. දෝෂ විස්තරය: ' + error.message;
+                // Try fallback method if popup fails - already handled in the main function
+                break;
+            case 'auth/timeout':
+                displayMessage = 'කාල නිමාව ඉක්මවා ඇත. ඔබගේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.';
+                break;
+            case 'auth/user-token-expired':
+                displayMessage = 'පරිශීලක සැසිය කල් ඉකුත් වී ඇත. කරුණාකර නැවත පිවිසෙන්න.';
+                break;
+            case 'auth/web-storage-unsupported':
+                displayMessage = 'ඔබගේ බ්‍රවුසරය වෙබ් ගබඩාව සඳහා සහාය නොදක්වයි. කරුණාකර වෙනත් බ්‍රවුසරයක් භාවිතා කරන්න.';
+                break;
+            default:
+                if (error.message) {
+                    displayMessage += error.message;
+                } else {
+                    displayMessage += "අභ්‍යන්තර දෝෂයක්. කරුණාකර පසුව නැවත උත්සාහ කරන්න.";
+                }
+        }
+        
+        showMessage(displayMessage, 'error');
+        resetGoogleButton();
+    }
+    
+    // Reset Google button state
+    function resetGoogleButton() {
+        googleSignInButton.disabled = false;
+        googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+        hideLoading();
+    }
+    
+    // Send the Google ID token to backend with better error handling
     async function handleGoogleLoginWithToken(idToken) {
         try {
             const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
@@ -336,33 +357,49 @@ $additional_scripts = <<<HTML
                 handleLoginSuccess(backendData, true);
             } else {
                 handleApiError(backendData, backendResponse.status);
-                googleSignInButton.disabled = false;
-                googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
-                hideLoading();
+                resetGoogleButton();
             }
         } catch (error) {
             console.error("Backend Google login error:", error);
-            showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
-            googleSignInButton.disabled = false;
-            googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
-            hideLoading();
+            showMessage('සේවාදායකය සමඟ සම්බන්ධ වීමේදී දෝෂයක් ඇතිවිය. කරුණාකර ඔබගේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.', 'error');
+            resetGoogleButton();
         }
     }
     
-    // Fallback method using redirect instead of popup
-    function tryRedirectAuth() {
-        try {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            provider.addScope('email');
-            provider.addScope('profile');
+    // Check for redirect result on page load with better error handling
+    function checkRedirectResult() {
+        if (sessionStorage.getItem('auth_redirect_attempt')) {
+            // Clear the flag
+            sessionStorage.removeItem('auth_redirect_attempt');
             
-            // Save that we're attempting redirect auth
-            sessionStorage.setItem('auth_redirect_attempt', 'true');
+            // Show loading while we check the result
+            showLoading();
             
-            // Use redirect method instead
-            firebaseAuth.signInWithRedirect(provider);
-        } catch (error) {
-            console.error("Redirect auth fallback error:", error);
+            firebaseAuth.getRedirectResult()
+                .then(async (result) => {
+                    hideLoading();
+                    if (result && result.user) {
+                        // Get the Firebase ID token
+                        try {
+                            const idToken = await result.user.getIdToken(true);
+                            handleGoogleLoginWithToken(idToken);
+                        } catch (tokenError) {
+                            console.error("Error getting ID token:", tokenError);
+                            showMessage('පරිශීලක හඳුනාගැනීමේ දෝෂයක්. කරුණාකර නැවත උත්සාහ කරන්න.', 'error');
+                            resetGoogleButton();
+                        }
+                    } else {
+                        // No result means the redirect failed or was cancelled
+                        showMessage('Google පිවිසුම අවලංගු කරන ලදී හෝ අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.', 'error');
+                        resetGoogleButton();
+                    }
+                })
+                .catch((error) => {
+                    hideLoading();
+                    console.error("Redirect result error:", error);
+                    showMessage('Google පිවිසුම් ප්‍රතිදිශාගත කිරීමේදී දෝෂයක් ඇතිවිය: ' + error.message, 'error');
+                    resetGoogleButton();
+                });
         }
     }
 
@@ -497,6 +534,9 @@ $additional_scripts = <<<HTML
         }
         messageArea.className = `my-6 p-3 rounded-md text-center font-medium text-sm \${typeClasses}`;
         messageArea.style.display = 'block';
+        
+        // Make sure the message is visible
+        messageArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     
     function showInputError(element, message) {
@@ -534,6 +574,59 @@ $additional_scripts = <<<HTML
         submitButton.disabled = false;
         // Restore original button text/structure
         submitButton.innerHTML = `<span id="buttonText">ඇතුල් වන්න</span>`;
+    }
+    
+    function isValidEmail(email) {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return re.test(String(email).toLowerCase());
+    }
+    
+    // Save referrer information for redirecting back after login
+    function checkReferrer() {
+        // Check referrer to see if it's from an internal site we should redirect back to
+        const referrer = document.referrer;
+        
+        if (referrer && (
+            referrer.includes('events.kdj.lk') || 
+            referrer.includes('singlish.kdj.lk')
+        )) {
+            // If referred from one of our other sites, store it for redirect after login
+            sessionStorage.setItem('redirectAfterLogin', referrer);
+        }
+    }
+    
+    // Store authentication data with proper handling
+    function storeAuthData(data, rememberMe) {
+        // Access token always goes in session storage
+        if (data.access_token) {
+            sessionStorage.setItem('auth_token', data.access_token);
+            
+            // Store token expiry if provided
+            if (data.expires_in) {
+                const expiryTime = Date.now() + (data.expires_in * 1000);
+                sessionStorage.setItem('token_expiry', expiryTime.toString());
+            }
+        }
+        
+        // Refresh token goes in localStorage if rememberMe, otherwise sessionStorage
+        if (data.refresh_token) {
+            if (rememberMe) {
+                localStorage.setItem('refresh_token', data.refresh_token);
+                sessionStorage.removeItem('refresh_token');
+            } else {
+                sessionStorage.setItem('refresh_token', data.refresh_token);
+                localStorage.removeItem('refresh_token');
+            }
+        }
+        
+        // Store user ID if provided
+        if (data.user_id) {
+            if (rememberMe) {
+                localStorage.setItem('user_id', data.user_id);
+            } else {
+                sessionStorage.setItem('user_id', data.user_id);
+            }
+        }
     }
     
     // Add event listener to Google Sign-In Button
