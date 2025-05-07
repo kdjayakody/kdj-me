@@ -1,4 +1,3 @@
-```php
 <?php
 // Set page specific variables
 $title = "Verify Email";
@@ -12,6 +11,7 @@ $additional_head = <<<HTML
         background-image: url('/assets/images/sl-pattern.png');
         background-size: cover;
         background-position: center;
+        min-height: 100vh;
     }
     .verify-card {
         backdrop-filter: blur(10px);
@@ -34,7 +34,7 @@ HTML;
 include 'header.php';
 ?>
 
-<div class="auth-container flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+<div class="auth-container flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="verify-card max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-lg">
         <div class="text-center">
             <div id="loadingIcon" class="mx-auto flex items-center justify-center">
@@ -136,6 +136,30 @@ include 'header.php';
                 </div>
             </form>
         </div>
+        
+        <!-- Already Verified State -->
+        <div id="alreadyVerifiedState" class="mt-8 hidden">
+            <div class="bg-blue-50 p-4 rounded-md border border-blue-200 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-400 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-blue-800">ඊමේල් ලිපිනය දැනටමත් තහවුරු කර ඇත</h3>
+                        <div class="mt-2 text-sm text-blue-700">
+                            <p>ඔබගේ ඊමේල් ලිපිනය දැනටමත් තහවුරු කර ඇත. ඔබට දැන් ඔබගේ ගිණුමට පිවිසිය හැකිය.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-center">
+                <a href="index.php" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-kdj-red hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red">
+                    <i class="fas fa-sign-in-alt mr-2"></i>
+                    පිවිසුම් පිටුවට
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -146,7 +170,7 @@ $additional_scripts = <<<HTML
     // Configuration
     const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
     
-    // Elements
+    // DOM Elements
     const loadingIcon = document.getElementById('loadingIcon');
     const successIcon = document.getElementById('successIcon');
     const errorIcon = document.getElementById('errorIcon');
@@ -159,31 +183,38 @@ $additional_scripts = <<<HTML
     const resendForm = document.getElementById('resendForm');
     const resendEmail = document.getElementById('resendEmail');
     const resendSubmitBtn = document.getElementById('resendSubmitBtn');
+    const alreadyVerifiedState = document.getElementById('alreadyVerifiedState');
     
     // Get verification token from URL
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
+    let originalEmail = urlParams.get('email') || '';
     
-    // Verify email when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        verifyEmail();
-    });
-    
-    // Handle errors with missing token
-    if (!token) {
-        setTimeout(() => {
-            loadingIcon.classList.add('hidden');
-            errorIcon.classList.remove('hidden');
-            statusMessage.textContent = 'තහවුරු කිරීමේ සබැඳිය වලංගු නොවේ.';
-            errorMessage.textContent = 'තහවුරු කිරීමේ ටෝකනයක් සපයා නැත. කරුණාකර ඊමේල් එකේ ඇති සබැඳිය හරහා පිවිසෙන්න.';
-            errorState.classList.remove('hidden');
-        }, 1000);
+    // Pre-fill the email field if provided in URL
+    if (originalEmail && resendEmail) {
+        resendEmail.value = decodeURIComponent(originalEmail);
     }
     
-    // Verify email function
+    // Verify email on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!token) {
+            showMissingTokenError();
+        } else {
+            verifyEmail();
+        }
+    });
+    
+    // Show error when token is missing
+    function showMissingTokenError() {
+        loadingIcon.classList.add('hidden');
+        errorIcon.classList.remove('hidden');
+        statusMessage.textContent = 'තහවුරු කිරීමේ සබැඳිය වලංගු නොවේ.';
+        errorMessage.textContent = 'තහවුරු කිරීමේ ටෝකනයක් සපයා නැත. කරුණාකර ඊමේල් එකේ ඇති සබැඳිය හරහා පිවිසෙන්න හෝ නව තහවුරු කිරීමේ සබැඳියක් ඉල්ලන්න.';
+        errorState.classList.remove('hidden');
+    }
+    
+    // Verify email with token
     async function verifyEmail() {
-        if (!token) return;
-        
         try {
             const response = await fetch(`\${apiBaseUrl}/auth/verify-email`, {
                 method: 'POST',
@@ -204,35 +235,26 @@ $additional_scripts = <<<HTML
                 successIcon.classList.remove('hidden');
                 statusMessage.textContent = 'ඊමේල් තහවුරු කිරීම සාර්ථකයි!';
                 successState.classList.remove('hidden');
+                
+                // If user is already logged in, update the verification status in the current session
+                const authToken = sessionStorage.getItem('auth_token');
+                if (authToken) {
+                    refreshUserData(authToken);
+                }
+                
+                // Optional: redirect to dashboard after a delay if user is logged in
+                if (sessionStorage.getItem('auth_token')) {
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.php';
+                    }, 3000);
+                }
             } else {
-                // Show error state
+                // Show appropriate error state
                 errorIcon.classList.remove('hidden');
                 statusMessage.textContent = 'ඊමේල් තහවුරු කිරීම අසාර්ථකයි.';
                 
-                // Set appropriate error message
-                if (responseData.detail) {
-                    if (typeof responseData.detail === 'string') {
-                        if (responseData.detail.includes('expired')) {
-                            errorMessage.textContent = 'තහවුරු කිරීමේ සබැඳිය කල් ඉකුත් වී ඇත. කරුණාකර නව සබැඳියක් ඉල්ලන්න.';
-                        } else if (responseData.detail.includes('invalid')) {
-                            errorMessage.textContent = 'තහවුරු කිරීමේ සබැඳිය වලංගු නොවේ. කරුණාකර නව සබැඳියක් ඉල්ලන්න.';
-                        } else if (responseData.detail.includes('already verified')) {
-                            errorMessage.textContent = 'ඔබගේ ඊමේල් ලිපිනය දැනටමත් තහවුරු කර ඇත.';
-                            // Redirect to login after 3 seconds
-                            setTimeout(() => {
-                                window.location.href = 'index.php';
-                            }, 3000);
-                        } else {
-                            errorMessage.textContent = responseData.detail;
-                        }
-                    } else {
-                        errorMessage.textContent = 'ඊමේල් තහවුරු කිරීමේදී දෝෂයක් ඇති විය.';
-                    }
-                } else {
-                    errorMessage.textContent = 'ඊමේල් තහවුරු කිරීමේදී දෝෂයක් ඇති විය.';
-                }
-                
-                errorState.classList.remove('hidden');
+                // Handle different error cases
+                handleVerificationError(responseData, response.status);
             }
         } catch (error) {
             console.error('Email verification error:', error);
@@ -246,8 +268,76 @@ $additional_scripts = <<<HTML
         }
     }
     
+    // Handle different verification error cases
+    function handleVerificationError(responseData, status) {
+        // Check if email is already verified
+        if (status === 400 && responseData.detail && responseData.detail.includes('already verified')) {
+            showAlreadyVerifiedState();
+            return;
+        }
+        
+        // Set appropriate error message
+        if (responseData.detail) {
+            if (typeof responseData.detail === 'string') {
+                if (responseData.detail.includes('expired')) {
+                    errorMessage.textContent = 'තහවුරු කිරීමේ සබැඳිය කල් ඉකුත් වී ඇත. කරුණාකර නව සබැඳියක් ඉල්ලන්න.';
+                } else if (responseData.detail.includes('invalid')) {
+                    errorMessage.textContent = 'තහවුරු කිරීමේ සබැඳිය වලංගු නොවේ. කරුණාකර නව සබැඳියක් ඉල්ලන්න.';
+                } else {
+                    errorMessage.textContent = responseData.detail;
+                }
+            } else {
+                errorMessage.textContent = 'ඊමේල් තහවුරු කිරීමේදී දෝෂයක් ඇති විය.';
+            }
+        } else {
+            errorMessage.textContent = 'ඊමේල් තහවුරු කිරීමේදී දෝෂයක් ඇති විය.';
+        }
+        
+        // Show error state
+        errorState.classList.remove('hidden');
+    }
+    
+    // Show already verified state
+    function showAlreadyVerifiedState() {
+        alreadyVerifiedState.classList.remove('hidden');
+        errorState.classList.add('hidden');
+        statusMessage.textContent = 'ඊමේල් ලිපිනය දැනටමත් තහවුරු කර ඇත.';
+        
+        // Optional: redirect to login page after a delay
+        setTimeout(() => {
+            window.location.href = 'index.php';
+        }, 3000);
+    }
+    
+    // Refresh user data after verification (if user is logged in)
+    async function refreshUserData(authToken) {
+        try {
+            const response = await fetch(`\${apiBaseUrl}/users/me`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer \${authToken}`
+                },
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const userData = await response.json();
+                
+                // Update any UI elements that display the verification status
+                if (userData.email_verified) {
+                    console.log('User email verification status updated in session.');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to refresh user data:', error);
+            // Non-critical error, don't display to user
+        }
+    }
+    
     // Show resend form
-    resendBtn.addEventListener('click', function() {
+    resendBtn.addEventListener('click', function(e) {
+        e.preventDefault();
         errorState.classList.add('hidden');
         resendFormContainer.classList.remove('hidden');
         resendEmail.focus();
@@ -261,6 +351,11 @@ $additional_scripts = <<<HTML
         
         if (!email) {
             showToast('කරුණාකර ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.', 'error');
+            return;
+        }
+        
+        if (!isValidEmail(email)) {
+            showToast('කරුණාකර වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.', 'error');
             return;
         }
         
@@ -279,37 +374,67 @@ $additional_scripts = <<<HTML
                 body: JSON.stringify({ email: email })
             });
             
-            const responseData = await response.json();
-            
-            // Always show success message for security (don't reveal if email exists)
+            // Always show success message for security reasons
+            // (don't reveal if email exists or not)
             showToast('තහවුරු කිරීමේ ඊමේල් පණිවිඩය සාර්ථකව යවන ලදි. කරුණාකර ඔබගේ ඊමේල් inbox එක පරීක්ෂා කරන්න.', 'success');
             
-            // Hide resend form and show success state with modified message
+            // Hide resend form and show success message
             resendFormContainer.classList.add('hidden');
             loadingIcon.classList.add('hidden');
             successIcon.classList.remove('hidden');
-            successState.classList.remove('hidden');
             statusMessage.textContent = 'නව තහවුරු කිරීමේ සබැඳියක් යවා ඇත';
             
-            // Update success state message
-            const successStateMessage = successState.querySelector('.text-green-700 p');
-            if (successStateMessage) {
-                successStateMessage.textContent = 'නව තහවුරු කිරීමේ සබැඳියක් ඔබගේ ඊමේල් ලිපිනයට යවා ඇත. කරුණාකර ඔබගේ ඊමේල් inbox එක පරීක්ෂා කරන්න.';
-            }
+            // Create a custom success message
+            const customSuccess = document.createElement('div');
+            customSuccess.className = 'mt-8';
+            customSuccess.innerHTML = `
+                <div class="bg-green-50 p-4 rounded-md border border-green-200 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-green-800">තහවුරු කිරීමේ ඊමේල් යවා ඇත</h3>
+                            <div class="mt-2 text-sm text-green-700">
+                                <p>නව තහවුරු කිරීමේ සබැඳියක් <strong>\${email}</strong> වෙත යවා ඇත. කරුණාකර ඔබගේ ඊමේල් inbox එක පරීක්ෂා කරන්න.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-center">
+                    <a href="index.php" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-kdj-red hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red">
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        පිවිසුම් පිටුවට
+                    </a>
+                </div>
+            `;
+            
+            // Remove any existing states and add the custom success
+            [errorState, resendFormContainer, successState, alreadyVerifiedState].forEach(el => {
+                if (el.classList) el.classList.add('hidden');
+            });
+            
+            document.querySelector('.verify-card').appendChild(customSuccess);
             
         } catch (error) {
             console.error('Resend verification email error:', error);
             showToast('ඊමේල් යැවීමේදී දෝෂයක් ඇති විය. කරුණාකර පසුව නැවත උත්සාහ කරන්න.', 'error');
-        } finally {
+            
             // Re-enable button
             resendSubmitBtn.disabled = false;
             resendSubmitBtn.innerHTML = originalButtonText;
         }
     });
+    
+    // Email validation helper
+    function isValidEmail(email) {
+        const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+        return re.test(String(email).toLowerCase());
+    }
 </script>
 HTML;
 
 // Include footer
 include 'footer.php';
 ?>
-```
