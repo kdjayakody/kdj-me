@@ -38,6 +38,9 @@
     </footer>
     <?php endif; ?>
 
+    <!-- Toast container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50"></div>
+
     <!-- Toast notification script -->
     <script>
         // Toast notification function
@@ -119,6 +122,7 @@
                 sessionStorage.removeItem('auth_token');
                 sessionStorage.removeItem('token_expiry');
                 sessionStorage.removeItem('refresh_token');
+                localStorage.removeItem('refresh_token');
                 localStorage.removeItem('user_id');
                 
                 // Redirect to login page
@@ -126,9 +130,11 @@
             })
             .catch(error => {
                 // Still clear storage and redirect on error
+                console.error('Logout error:', error);
                 sessionStorage.removeItem('auth_token');
                 sessionStorage.removeItem('token_expiry');
                 sessionStorage.removeItem('refresh_token');
+                localStorage.removeItem('refresh_token');
                 localStorage.removeItem('user_id');
                 
                 window.location.href = '/index.php';
@@ -143,47 +149,43 @@
             mobileLogoutBtn.addEventListener('click', handleLogout);
         }
 
-        // CSRF protection - Add token to all requests
-        function generateCSRFToken() {
-            return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        }
-        
-        // Store CSRF token in session storage if not already set
-        if (!sessionStorage.getItem('csrf_token')) {
-            sessionStorage.setItem('csrf_token', generateCSRFToken());
-        }
-        
         // Security helper for sanitizing inputs
-        function sanitizeInput(input) {
+        function sanitizeHTML(input) {
+            if (!input) return '';
+            
             const div = document.createElement('div');
             div.textContent = input;
             return div.innerHTML;
         }
         
-        // Check if user is logged in by trying to fetch profile
+        // Check if user is logged in on protected pages
         function checkUserAuth() {
-            if (window.location.pathname.includes('dashboard') || 
-                window.location.pathname.includes('profile') || 
-                window.location.pathname.includes('settings') ||
-                window.location.pathname.includes('security')) {
-                
-                // Check if token is about to expire
-                const tokenExpiry = sessionStorage.getItem('token_expiry');
-                if (tokenExpiry && parseInt(tokenExpiry) - 300000 < Date.now()) {
-                    refreshAuthToken();
-                }
-                
-                // Get auth token from session storage
+            const protectedPages = [
+                'dashboard.php', 
+                'profile.php', 
+                'settings.php',
+                'security.php'
+            ];
+            
+            const currentPage = window.location.pathname.split('/').pop();
+            
+            if (protectedPages.includes(currentPage)) {
+                // Check for auth token
                 const authToken = sessionStorage.getItem('auth_token');
                 
-                // Prepare headers with token if available
-                const headers = {
-                    'Accept': 'application/json'
-                };
-                
-                if (authToken) {
-                    headers['Authorization'] = `Bearer ${authToken}`;
+                if (!authToken) {
+                    // No token, redirect to login page
+                    // Store current URL for redirect after login
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                    window.location.href = '/index.php';
+                    return;
                 }
+                
+                // Verify token by making an API call
+                const headers = {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                };
                 
                 fetch('https://auth.kdj.lk/api/v1/users/me', {
                     method: 'GET',
@@ -192,50 +194,33 @@
                 })
                 .then(response => {
                     if (!response.ok) {
-                        console.error('Auth check failed: ' + response.status);
-                        // Clear session storage if unauthorized
-                        if (response.status === 401) {
-                            // Try to refresh the token
-                            return refreshAuthToken().then(refreshed => {
-                                if (!refreshed) {
-                                    sessionStorage.removeItem('auth_token');
-                                    sessionStorage.removeItem('token_expiry');
-                                    sessionStorage.removeItem('refresh_token');
-                                    window.location.href = '/index.php';
-                                    return null;
-                                }
+                        // Try to refresh the token
+                        refreshAuthToken().then(refreshed => {
+                            if (!refreshed) {
+                                // Clear session storage
+                                sessionStorage.removeItem('auth_token');
+                                sessionStorage.removeItem('token_expiry');
                                 
-                                // If token refreshed, try to get user again
-                                return checkUserAuth();
-                            });
-                        }
-                        
-                        // Redirect to login for other errors
-                        window.location.href = '/index.php';
-                        return null;
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data) {
-                        // Update user name in the header
-                        const userDisplayName = document.getElementById('userDisplayName');
-                        if (userDisplayName) {
-                            userDisplayName.textContent = data.display_name || data.email;
-                        }
+                                // Save current URL for redirect after login
+                                sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                                
+                                // Redirect to login page
+                                window.location.href = '/index.php';
+                            }
+                        });
                     }
                 })
                 .catch(error => {
                     console.error('Auth check error:', error);
-                    // Redirect to login on error
+                    // Redirect to login page
                     window.location.href = '/index.php';
                 });
             }
         }
 
-        // Refresh auth token
+        // Refresh auth token function
         async function refreshAuthToken() {
-            const refreshToken = sessionStorage.getItem('refresh_token');
+            const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token');
             if (!refreshToken) return false;
             
             try {
@@ -268,7 +253,11 @@
                     
                     // Store refresh token if provided
                     if (data.refresh_token) {
-                        sessionStorage.setItem('refresh_token', data.refresh_token);
+                        if (localStorage.getItem('refresh_token')) {
+                            localStorage.setItem('refresh_token', data.refresh_token);
+                        } else {
+                            sessionStorage.setItem('refresh_token', data.refresh_token);
+                        }
                     }
                     
                     return true;
@@ -281,17 +270,9 @@
             }
         }
 
-        // Run auth check on protected pages
+        // Run auth check on page load
         document.addEventListener('DOMContentLoaded', function() {
             checkUserAuth();
-            
-            // Set up periodic token refresh every 5 minutes
-            setInterval(async () => {
-                const tokenExpiry = sessionStorage.getItem('token_expiry');
-                if (tokenExpiry && parseInt(tokenExpiry) - 300000 < Date.now()) {
-                    await refreshAuthToken();
-                }
-            }, 300000); // 5 minutes
         });
     </script>
     
