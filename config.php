@@ -186,24 +186,6 @@ function getCookie($name) {
     return isset($_COOKIE[$name]) ? $_COOKIE[$name] : null;
 }
 
-/**
- * Sets a cookie with secure defaults
- */
-function setCookie($name, $value, $expire_days = 30, $path = '/', $domain = null, $secure = null, $httponly = true) {
-    $secure = $secure === null ? config('security.secure_cookies', true) : $secure;
-    $domain = $domain ?: $_SERVER['HTTP_HOST'];
-    
-    $options = [
-        'expires' => time() + ($expire_days * 86400),
-        'path' => $path,
-        'domain' => $domain,
-        'secure' => $secure,
-        'httponly' => $httponly,
-        'samesite' => 'Lax'
-    ];
-    
-    return setcookie($name, $value, $options);
-}
 
 /**
  * Define global constants for API endpoints
