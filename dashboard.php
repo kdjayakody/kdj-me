@@ -368,9 +368,8 @@ $additional_scripts = <<<HTML
     }
     
     // Refresh auth token
-    // Refresh auth token
     async function refreshAuthToken() {
-        const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token'); // <<< නිවැරදි කරන ලදී
+        const refreshToken = sessionStorage.getItem('refresh_token');
         if (!refreshToken) return false;
         
         try {
@@ -401,13 +400,9 @@ $additional_scripts = <<<HTML
                     sessionStorage.setItem('token_expiry', expiryTime.toString());
                 }
                 
-                // Store refresh token if provided, matching the logic in footer.php
+                // Store refresh token if provided
                 if (data.refresh_token) {
-                    if (localStorage.getItem('refresh_token')) { // <<< නිවැරදි කරන ලදී
-                        localStorage.setItem('refresh_token', data.refresh_token);
-                    } else {
-                        sessionStorage.setItem('refresh_token', data.refresh_token);
-                    }
+                    sessionStorage.setItem('refresh_token', data.refresh_token);
                 }
                 
                 return true;
