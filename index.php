@@ -104,17 +104,17 @@ include 'header.php';
             </div>
             </form> <div class="my-6 flex items-center justify-center">
           <div class="border-t border-gray-300 flex-grow"></div>
-          <span class="px-4 text-sm text-gray-500 bg-white login-card">හෝ</span>
+          <!-- <span class="px-4 text-sm text-gray-500 bg-white login-card">හෝ</span> -->
           <div class="border-t border-gray-300 flex-grow"></div>
       </div>
 
-      <div>
+      <!-- <div>
           <button type="button" id="googleSignInButton"
                   class="w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed">
               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google icon" class="w-5 h-5 mr-2">
               <span>Google සමඟින් පිවිසෙන්න</span>
           </button>
-      </div>
+      </div> -->
 
       <div class="mt-8 text-center text-sm">
             <span class="text-gray-600">ගිණුමක් නැද්ද?</span>
