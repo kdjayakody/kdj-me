@@ -152,6 +152,20 @@ $additional_scripts = <<<HTML
     const emailErrorEl = document.getElementById('emailError');
     const passwordErrorEl = document.getElementById('passwordError');
     
+    // Check if there's a redirect URL in the query parameters
+    function checkForRedirectInURL() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectURL = urlParams.get('redirect');
+        
+        if (redirectURL) {
+            // Store the redirect URL for after login
+            sessionStorage.setItem('redirectAfterLogin', decodeURIComponent(redirectURL));
+        }
+    }
+    
+    // Run it when page loads
+    checkForRedirectInURL();
+    
     // Google Sign-In Button DOM Element
     const googleSignInButton = document.getElementById('googleSignInButton');
 
@@ -313,7 +327,7 @@ $additional_scripts = <<<HTML
                 .catch((error) => {
                     console.error("Redirect result error:", error);
                     hideLoading();
-                    showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සාහ කරන්න.', 'error');
+                    showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
                 });
         }
     }
@@ -399,12 +413,26 @@ $additional_scripts = <<<HTML
         showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
         handleTokenStorage(data, rememberMe);
         
-        // Redirect based on MFA status
-        const redirectTarget = (data.mfa_required && data.mfa_methods?.length > 0)
-            ? `mfa.php?methods=\${data.mfa_methods.join(',')}` // MFA page
-            : REDIRECT_URL; // Dashboard
+        // Check if MFA is required
+        if (data.mfa_required && data.mfa_methods?.length > 0) {
+            // Redirect to MFA page
+            setTimeout(() => { 
+                window.location.href = `mfa.php?methods=\${data.mfa_methods.join(',')}`; 
+            }, 1000);
+            return;
+        }
         
-        setTimeout(() => { window.location.href = redirectTarget; }, 1000);
+        // Get the redirect URL if available, otherwise use dashboard
+        const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+        
+        if (redirectAfterLogin) {
+            // Clear the redirect URL before navigating
+            sessionStorage.removeItem('redirectAfterLogin');
+            setTimeout(() => { window.location.href = redirectAfterLogin; }, 1000);
+        } else {
+            // Default to dashboard
+            setTimeout(() => { window.location.href = REDIRECT_URL; }, 1000);
+        }
     }
     
     function handleTokenStorage(data, rememberMe) {
