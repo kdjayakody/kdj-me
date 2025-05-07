@@ -116,7 +116,6 @@ if (isset($description)) {
     <!-- Custom CSS -->
     <style>
         body {
-        display: none;
             font-family: 'Nunito', sans-serif;
         }
         
@@ -144,19 +143,11 @@ if (isset($description)) {
         ::-webkit-scrollbar-thumb:hover {
             background: #a41a1f;
         }
-
-    /* Public pages explicitly show the body */
-    body.public-page {
-        display: block;
-        font-family: 'Nunito', sans-serif;
-
-    }
-</style>
+    </style>
     
     <?php if (isset($additional_head)) echo $additional_head; ?>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    
     <!-- Loading Indicator -->
     <div id="loadingIndicator" class="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-white bg-opacity-80 z-50" style="display: none;">
         <div class="loader h-16 w-16 border-4 border-gray-200 rounded-full"></div>
