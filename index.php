@@ -1,145 +1,157 @@
 <?php
-// Check if user is already logged in
-$auth_token = isset($_COOKIE['auth_token']) ? $_COOKIE['auth_token'] : '';
-if (empty($auth_token)) {
-    // Check for token in session storage via JavaScript
-    echo "<script>
-        if (sessionStorage.getItem('auth_token')) {
-            window.location.href = 'dashboard.php';
-        }
-    </script>";
-}
+// index.php (Login Page)
 
-// Set page specific variables
+// Page specific variables
 $title = "Login";
-$description = "Sign in to your KDJ Lanka account";
-$lang = "si";
+$description = "Sign in to your KDJ Lanka account to access services and manage your profile.";
+$lang = "si"; // Default language for the page
 
-// Define API base URL
-$apiBaseUrl = 'https://auth.kdj.lk/api/v1';
-
-// Add page specific scripts/styles
+// Add page-specific styles or head elements if necessary
 $additional_head = <<<HTML
 <style>
     .auth-container {
-        background-image: url('/assets/images/sl-pattern.png');
+        background-image: url('/assets/images/sl-pattern.png'); /* Ensure path is correct */
         background-size: cover;
         background-position: center;
+        /* Consider adding a fallback background color if the image fails to load */
+        /* background-color: #f0f2f5; */
     }
     .login-card {
-        backdrop-filter: blur(10px);
-        background-color: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(8px); /* Slightly adjusted blur */
+        background-color: rgba(255, 255, 255, 0.97); /* Very slightly more opaque */
+        border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
     }
-    /* Custom styles for the login form */
+    /* Custom focus style for inputs, if Tailwind's default needs override */
     .form-input:focus {
-        outline: none;
-        border-color: #f87171;
-        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
-    }
-    /* Google Sign-In button */
-    .google-signin-btn {
-        transition: all 0.3s ease;
+        /* border-color: #cb2127; */ /* kdj-red - Tailwind focus:border-kdj-red should handle this */
+        /* box-shadow: 0 0 0 3px rgba(203, 33, 39, 0.2); */ /* kdj-red with opacity - Tailwind focus:ring-kdj-red focus:ring-opacity-xx should handle */
     }
     .google-signin-btn:hover {
-        background-color: #f3f4f6;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* Enhanced hover shadow */
+    }
+    #messageArea {
+        transition: opacity 0.3s ease-in-out;
+    }
+    #messageArea.error {
+        background-color: #fff5f5; /* Tailwind red-50 */
+        border-color: #fecaca; /* Tailwind red-200 */
+        color: #991b1b; /* Tailwind red-800 */
+    }
+    #messageArea.success {
+        background-color: #f0fdf4; /* Tailwind green-50 */
+        border-color: #bbf7d0; /* Tailwind green-200 */
+        color: #166534; /* Tailwind green-800 */
+    }
+    .input-error-text {
+        font-size: 0.875rem; /* text-sm */
+        color: #dc2626; /* Tailwind red-600 */
+        font-weight: 500; /* medium */
     }
 </style>
 HTML;
 
-// Include header
-include 'header.php';
+include 'header.php'; // Includes Firebase initialization and global head elements
 ?>
 
-<div class="auth-container flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-    <div class="login-card max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-lg">
+<div class="auth-container flex items-center justify-center min-h-screen bg-gray-100 py-8 px-4 sm:px-6 lg:px-8">
+    <div class="login-card max-w-lg w-full space-y-8 p-8 sm:p-12 bg-white rounded-xl shadow-xl">
         <div class="text-center">
-            <img src="assets/img/kdjcolorlogo.png" class="mx-auto w-40">
-            <h2 class="mt-6 text-3xl font-extrabold text-kdj-dark">
+            <a href="/" aria-label="KDJ Lanka Home">
+                <img src="/assets/img/kdjcolorlogo.png" alt="KDJ Lanka Logo" class="mx-auto w-36 sm:w-44 mb-5 transition-transform hover:scale-105">
+            </a>
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-kdj-dark">
                 ගිණුමට පිවිසෙන්න
-            </h2>
-            <p class="mt-2 text-sm text-gray-600">
+            </h1>
+            <p class="mt-3 text-base text-gray-600">
                 නැවතත් ඔබව සාදරයෙන් පිළිගනිමු!
             </p>
         </div>
 
-        <div id="messageArea" class="my-6 p-3 rounded-md text-center font-medium text-sm hidden"></div>
-
-        <form id="loginForm" class="mt-8 space-y-6">
-            <div>
-                <label for="email" class="block text-xs font-medium text-gray-700 mb-1">ඊමේල් ලිපිනය</label>
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 w-8 text-center text-gray-700">
-                        <i class="fas fa-envelope text-base"></i>
-                    </div>
-                    <input type="email" id="email" name="email" required
-                        class="form-input flex-grow block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:border-kdj-red focus:ring-kdj-red sm:text-sm">
-                </div>
-                <p class="mt-1 text-xs text-red-500" id="emailError" style="display: none;"></p>
+        <div id="messageArea" class="my-5 p-4 rounded-lg text-center font-semibold text-sm hidden border-2" role="alert">
             </div>
 
+        <form id="loginForm" class="mt-8 space-y-6" novalidate>
             <div>
-                <label for="password" class="block text-xs font-medium text-gray-700 mb-1">මුරපදය</label>
-                <div class="flex items-center relative">
-                    <div class="flex-shrink-0 w-8 text-center text-gray-700">
-                        <i class="fas fa-lock text-base"></i>
-                    </div>
-                    <input type="password" id="password" name="password" required
-                        class="form-input flex-grow block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 pr-10 focus:border-kdj-red focus:ring-kdj-red sm:text-sm"> 
-                    <span class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-gray-700 hover:text-gray-900" id="togglePassword">
-                        <i class="fas fa-eye text-sm"></i>
+                <label for="email" class="block text-sm font-medium text-gray-800 mb-1.5">ඊමේල් ලිපිනය</label>
+                <div class="relative group">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-kdj-red transition-colors">
+                        <i class="fas fa-envelope"></i>
                     </span>
+                    <input type="email" id="email" name="email" required autocomplete="email"
+                        class="form-input pl-10 w-full border border-gray-300 rounded-lg shadow-sm py-3 px-4 focus:border-kdj-red focus:ring-2 focus:ring-kdj-red focus:ring-opacity-50 transition-shadow sm:text-sm"
+                        placeholder="உங்களது மின்னஞ்சல் முகவரி"> <?php // Example Tamil placeholder for i18n thought ?>
                 </div>
-                <p class="mt-1 text-xs text-red-500" id="passwordError" style="display: none;"></p>
+                <p class="mt-1.5 input-error-text" id="emailError" style="display: none;"></p>
             </div>
 
-            <div class="flex items-center justify-between text-xs sm:text-sm">
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-800 mb-1.5">මුරපදය</label>
+                <div class="relative group">
+                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-kdj-red transition-colors">
+                        <i class="fas fa-lock"></i>
+                    </span>
+                    <input type="password" id="password" name="password" required autocomplete="current-password"
+                        class="form-input pl-10 w-full border border-gray-300 rounded-lg shadow-sm py-3 px-4 pr-10 focus:border-kdj-red focus:ring-2 focus:ring-kdj-red focus:ring-opacity-50 transition-shadow sm:text-sm"
+                        placeholder="உங்கள் கடவுச்சொல்"> <?php // Example Tamil placeholder ?>
+                    <button type="button" tabindex="-1" aria-label="Toggle password visibility" class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-gray-500 hover:text-kdj-red transition-colors" id="togglePassword">
+                        <i class="fas fa-eye text-base"></i>
+                    </button>
+                </div>
+                <p class="mt-1.5 input-error-text" id="passwordError" style="display: none;"></p>
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
                 <div class="flex items-center">
                     <input type="checkbox" id="remember_me" name="remember_me"
-                        class="h-4 w-4 text-kdj-red focus:ring-kdj-red border-gray-300 rounded">
-                    <label for="remember_me" class="ml-2 block text-gray-700">මතක තබාගන්න</label>
+                        class="h-4 w-4 text-kdj-red focus:ring-kdj-red border-gray-400 rounded cursor-pointer">
+                    <label for="remember_me" class="ml-2 block text-gray-700 cursor-pointer">මතක තබාගන්න</label>
                 </div>
-
                 <div>
-                    <a href="forgot_password.php" class="font-medium text-kdj-red hover:text-red-800 hover:underline">මුරපදය අමතකද?</a>
+                    <a href="forgot_password.php" class="font-semibold text-kdj-red hover:text-red-700 hover:underline transition-colors">මුරපදය අමතකද?</a>
                 </div>
             </div>
 
             <div>
                 <button type="submit" id="submitButton"
-                    class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-kdj-red hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed">
+                    class="w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-lg shadow-md text-base font-semibold text-white bg-kdj-red hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red active:bg-red-800 transition-all duration-150 ease-in-out disabled:opacity-60 disabled:cursor-wait">
+                    <span id="buttonSpinner" class="hidden animate-spin mr-2"><i class="fas fa-circle-notch"></i></span>
                     <span id="buttonText">ඇතුල් වන්න</span>
                 </button>
             </div>
         </form>
-        
-        <div class="my-6 flex items-center justify-center">
+
+        <div class="my-6 flex items-center" aria-hidden="true">
             <div class="border-t border-gray-300 flex-grow"></div>
-            <span class="px-4 text-sm text-gray-500 bg-white login-card">හෝ</span>
+            <span class="px-3 text-sm font-medium text-gray-500">හෝ</span>
             <div class="border-t border-gray-300 flex-grow"></div>
         </div>
-        
+
         <div>
-            <button type="button" id="googleSignInButton" class="google-signin-btn w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red transition duration-150 ease-in-out">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google icon" class="w-5 h-5 mr-2">
-                <span>Google සමඟින් පිවිසෙන්න</span>
+            <button type="button" id="googleSignInButton" class="google-signin-btn w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red active:bg-gray-100 transition-all duration-150 ease-in-out disabled:opacity-60 disabled:cursor-wait">
+                <img src="/assets/images/google-logo.svg" alt="Google G Logo" class="w-5 h-5 mr-2.5"> <?php // Using a local or themed Google logo if preferred ?>
+                <span id="googleButtonText">Google සමඟින් පිවිසෙන්න</span>
+                <span id="googleButtonSpinner" class="hidden animate-spin ml-2"><i class="fas fa-circle-notch"></i></span>
             </button>
         </div>
 
-        <div class="mt-8 text-center text-sm">
-            <span class="text-gray-600">ගිණුමක් නැද්ද?</span>
-            <a href="register.php" class="font-medium text-kdj-red hover:text-red-800 hover:underline ml-1">ලියාපදිංචි වන්න</a>
+        <div class="mt-10 text-center text-sm">
+            <span class="text-gray-600">ගිණුමක් නැද්ද? </span>
+            <a href="register.php" class="font-semibold text-kdj-red hover:text-red-700 hover:underline transition-colors">ලියාපදිංචි වන්න</a>
         </div>
     </div>
 </div>
 
 <?php
-// Page specific scripts - adding the API base URL as a JavaScript variable at the beginning
+// $additional_scripts will be echoed in footer.php
+// utils.js is included in footer.php before this $additional_scripts block
 $additional_scripts = <<<HTML
 <script>
-    // Configuration
-    const apiBaseUrl = '{$apiBaseUrl}';
-    const REDIRECT_URL = 'dashboard.php';
-    
+// Ensure all functions from utils.js are available (they are if utils.js is loaded)
+// e.g., API_BASE_URL, LOGIN_PAGE_URL, DEFAULT_REDIRECT_AFTER_LOGIN,
+// apiRequest, checkUserAuthentication, showToast, showLoading, hideLoading,
+// isValidEmail, sanitizeHTML, startAutomaticTokenRefresh
+
+document.addEventListener('DOMContentLoaded', async function() {
     // DOM Elements
     const loginForm = document.getElementById('loginForm');
     const emailInput = document.getElementById('email');
@@ -147,473 +159,385 @@ $additional_scripts = <<<HTML
     const rememberMeInput = document.getElementById('remember_me');
     const messageArea = document.getElementById('messageArea');
     const submitButton = document.getElementById('submitButton');
-    const togglePassword = document.getElementById('togglePassword');
     const buttonText = document.getElementById('buttonText');
+    const buttonSpinner = document.getElementById('buttonSpinner');
+    const togglePasswordBtn = document.getElementById('togglePassword');
     const emailErrorEl = document.getElementById('emailError');
     const passwordErrorEl = document.getElementById('passwordError');
-    
-    // Check if there's a redirect URL in the query parameters
-    function checkForRedirectInURL() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const redirectURL = urlParams.get('redirect');
-        
-        if (redirectURL) {
-            // Store the redirect URL for after login
-            sessionStorage.setItem('redirectAfterLogin', decodeURIComponent(redirectURL));
+    const googleSignInButton = document.getElementById('googleSignInButton');
+    const googleButtonText = document.getElementById('googleButtonText');
+    const googleButtonSpinner = document.getElementById('googleButtonSpinner');
+
+    // --- 1. Initial Page Load Actions ---
+    async function performInitialAuthCheck() {
+        showLoading(); // Show global loader from utils.js
+        try {
+            const authenticatedUser = await checkUserAuthentication(); // From utils.js
+            if (authenticatedUser) {
+                showGlobalMessage('You are already logged in. Redirecting to your dashboard...', 'success', false); // Don't use toast here
+                const redirectTarget = sessionStorage.getItem('redirectAfterLogin') || DEFAULT_REDIRECT_AFTER_LOGIN;
+                sessionStorage.removeItem('redirectAfterLogin');
+                window.location.href = redirectTarget;
+                return true; // Indicates redirection is happening
+            }
+        } catch (e) {
+            // Error during initial check, usually means utils.js->apiRequest failed fundamentally
+            // before even getting to user auth logic. Let the user try to login.
+            console.error("Initial auth check error:", e);
+        } finally {
+            hideLoading(); // Hide global loader from utils.js
+        }
+        return false; // No redirection, login form should be usable
+    }
+
+    if (await performInitialAuthCheck()) {
+        return; // Stop further script execution if already redirecting
+    }
+
+    // Capture and store external redirect URL from query params
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectFromExternal = urlParams.get('redirect');
+    if (redirectFromExternal) {
+        try {
+            const decodedRedirect = decodeURIComponent(redirectFromExternal);
+            const url = new URL(decodedRedirect); // Validate URL structure
+            // Allow only kdj.lk subdomains or specific trusted domains for security
+            if (url.hostname.endsWith('.kdj.lk') || url.hostname === 'kdj.lk' || url.hostname === 'localhost') {
+                 sessionStorage.setItem('redirectAfterLogin', decodedRedirect);
+            } else {
+                console.warn('Blocked potentially unsafe redirect from external source:', decodedRedirect);
+            }
+        } catch (e) {
+            console.warn('Invalid redirect URL parameter:', redirectFromExternal, e.message);
         }
     }
-    
-    // Run it when page loads
-    checkForRedirectInURL();
-    
-    // Google Sign-In Button DOM Element
-    const googleSignInButton = document.getElementById('googleSignInButton');
 
-    // Google Sign-In Function
-    async function signInWithGoogle() {
-        if (!firebaseAuth) {
-            showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. Firebase සූදානම් නැත.', 'error');
+    // --- 2. Event Listeners Setup ---
+    if (togglePasswordBtn) {
+        togglePasswordBtn.addEventListener('click', () => {
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+            const icon = togglePasswordBtn.querySelector('i');
+            icon.classList.toggle('fa-eye');
+            icon.classList.toggle('fa-eye-slash');
+            passwordInput.focus(); // Keep focus on password input
+        });
+    }
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleRegularLogin);
+    }
+
+    if (googleSignInButton) {
+        if (typeof firebaseAuth !== 'undefined' && firebaseAuth) {
+            googleSignInButton.addEventListener('click', handleGoogleSignIn);
+            checkFirebaseAuthRedirectResult(); // For Firebase redirect auth flow
+        } else {
+            setGoogleButtonState(true, 'Google Sign-In N/A');
+            console.warn('Firebase Auth is not initialized. Google Sign-In disabled.');
+            // showToast('Google Sign-In is currently unavailable.', 'info');
+        }
+    }
+
+    // --- 3. Core Logic Functions ---
+    async function handleRegularLogin(event) {
+        event.preventDefault();
+        clearGlobalMessages();
+        clearInputErrors();
+
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        const rememberMe = rememberMeInput.checked;
+
+        if (!validateInputs(email, password)) {
             return;
         }
 
-        clearMessages();
-        // Disable button while processing
-        googleSignInButton.disabled = true;
-        googleSignInButton.querySelector('span').textContent = 'සකසමින්...';
+        setSubmitButtonState(true, 'පිවිසෙමින්...');
         showLoading();
 
         try {
-            // Create a Google Auth Provider with explicit scopes
+            const response = await apiRequest('/auth/login', { // From utils.js
+                method: 'POST',
+                body: JSON.stringify({ email, password, remember_me: rememberMe })
+            });
+            const data = await response.json(); // Try to parse JSON regardless of ok status for error details
+
+            if (response.ok) {
+                processLoginSuccess(data, rememberMe);
+            } else {
+                processLoginApiError(data, response.status);
+            }
+        } catch (error) { // Catches errors from apiRequest (network, timeout, or thrown "Session Expired")
+            console.error('Login Form Submission Error:', error);
+            showGlobalMessage(error.message || 'Login request failed. Please check your internet connection and try again.', 'error', true);
+        } finally {
+            setSubmitButtonState(false, 'ඇතුල් වන්න');
+            hideLoading();
+        }
+    }
+
+    async function handleGoogleSignIn() {
+        if (!firebaseAuth) {
+            showGlobalMessage('Google Sign-In is not available.', 'error', true);
+            return;
+        }
+        clearGlobalMessages();
+        clearInputErrors();
+        setGoogleButtonState(true, 'සකසමින්...');
+        showLoading();
+
+        try {
             const provider = new firebase.auth.GoogleAuthProvider();
             provider.addScope('email');
             provider.addScope('profile');
-            
-            // Set custom parameters for the Google provider
-            provider.setCustomParameters({
-                // Forces account selection even when one account is available
-                prompt: 'select_account',
-                // Specify Firebase project domain for better security
-                auth_domain: 'kdj-lanka.firebaseapp.com'
-            });
+            provider.setCustomParameters({ prompt: 'select_account' });
 
-            // Sign in with popup with explicit error handling
             const result = await firebaseAuth.signInWithPopup(provider);
-            
-            // Get the user from the result
             const user = result.user;
-            
-            if (user) {
-                // Get the Firebase ID token
-                const idToken = await user.getIdToken(true);
-                
-                // Send this idToken to your backend
-                const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ id_token: idToken }),
-                    credentials: 'include'
-                });
 
+            if (user) {
+                const idToken = await user.getIdToken(true);
+                const backendResponse = await apiRequest('/auth/google-login', {
+                    method: 'POST',
+                    body: JSON.stringify({ id_token: idToken })
+                });
                 const backendData = await backendResponse.json();
 
                 if (backendResponse.ok) {
-                    // Handle login success like regular login
-                    handleLoginSuccess(backendData, true);
+                    processLoginSuccess(backendData, true); // Assume "remember me" for social logins
                 } else {
-                    handleApiError(backendData, backendResponse.status);
-                    googleSignInButton.disabled = false;
-                    googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
-                    hideLoading();
+                    processLoginApiError(backendData, backendResponse.status);
                 }
             } else {
-                showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
-                googleSignInButton.disabled = false;
-                googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
-                hideLoading();
+                throw new Error('No user data received from Google Sign-In provider.');
             }
         } catch (error) {
-            console.error("Google Sign-In Error:", error);
-            
-            // Handle specific error codes with user-friendly messages
-            let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය: ';
-            
-            switch(error.code) {
-                case 'auth/popup-closed-by-user':
-                    displayMessage = 'පිවිසුම් කවුළුව වසා දමන ලදී.';
-                    break;
-                case 'auth/popup-blocked':
-                    displayMessage = 'බ්‍රවුසරය විසින් පොප්-අප් අවහිර කර ඇත. කරුණාකර ඔබේ බ්‍රවුසරයේ පොප්-අප් අවහිර කිරීම් පරීක්ෂා කරන්න.';
-                    break;
-                case 'auth/cancelled-popup-request':
-                    displayMessage = 'එකවර පිවිසුම් කවුළු කිහිපයක් විවෘත කර ඇත.';
-                    break;
-                case 'auth/network-request-failed':
-                    displayMessage = 'ජාල දෝෂයක්. ඔබගේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කරන්න.';
-                    break;
-                case 'auth/internal-error':
-                    displayMessage = 'අභ්‍යන්තර දෝෂයක්. කරුණාකර පසුව නැවත උත්සාහ කරන්න.';
-                    // Try fallback method if popup fails
-                    tryRedirectAuth();
-                    break;
-                default:
-                    displayMessage += error.message;
+            console.error("Google Sign-In Process Error:", error);
+            let displayMessage = 'Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. ';
+            if (error.code) {
+                handleFirebaseError(error.code, displayMessage);
+            } else {
+                showGlobalMessage(displayMessage + (error.message || 'Please try again.'), 'error', true);
             }
-            
-            showMessage(displayMessage, 'error');
-            googleSignInButton.disabled = false;
-            googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+        } finally {
+            setGoogleButtonState(false, 'Google සමඟින් පිවිසෙන්න');
             hideLoading();
         }
     }
     
-    // Fallback method using redirect instead of popup
-    function tryRedirectAuth() {
-        try {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            provider.addScope('email');
-            provider.addScope('profile');
-            
-            // Save that we're attempting redirect auth
-            sessionStorage.setItem('auth_redirect_attempt', 'true');
-            
-            // Use redirect method instead
-            firebaseAuth.signInWithRedirect(provider);
-        } catch (error) {
-            console.error("Redirect auth fallback error:", error);
-        }
-    }
-    
-    // Check for redirect result on page load
-    function checkRedirectResult() {
-        if (sessionStorage.getItem('auth_redirect_attempt')) {
-            // Clear the flag
-            sessionStorage.removeItem('auth_redirect_attempt');
-            
-            // Show loading while we check the result
-            showLoading();
-            
-            firebaseAuth.getRedirectResult()
-                .then(async (result) => {
-                    if (result.user) {
-                        // Get the Firebase ID token
-                        const idToken = await result.user.getIdToken(true);
-                        
-                        // Send to backend
-                        const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                            },
-                            body: JSON.stringify({ id_token: idToken }),
-                            credentials: 'include'
-                        });
-
-                        const backendData = await backendResponse.json();
-
-                        if (backendResponse.ok) {
-                            handleLoginSuccess(backendData, true);
-                        } else {
-                            handleApiError(backendData, backendResponse.status);
-                            hideLoading();
-                        }
-                    } else {
-                        hideLoading();
-                    }
-                })
-                .catch((error) => {
-                    console.error("Redirect result error:", error);
-                    hideLoading();
-                    showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
-                });
-        }
-    }
-
-    // Add Event Listener to Google Sign-In Button
-    if (googleSignInButton) {
-        googleSignInButton.addEventListener('click', signInWithGoogle);
-    }
-
-    // Toggle password visibility
-    togglePassword.addEventListener('click', () => {
-        const type = passwordInput.type === 'password' ? 'text' : 'password';
-        passwordInput.type = type;
-        const icon = togglePassword.querySelector('i');
-        icon.classList.toggle('fa-eye');
-        icon.classList.toggle('fa-eye-slash');
-    });
-    
-    // Form submission
-    loginForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        clearMessages();
-        disableSubmitButton('සකසමින්...'); // Show loading state
-        
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-        const rememberMe = rememberMeInput.checked;
-        
-        // Basic Client Validation
-        let isValid = validateInputs(email, password);
-        if (!isValid) {
-            enableSubmitButton();
+    async function checkFirebaseAuthRedirectResult() {
+        if (!firebaseAuth || sessionStorage.getItem('auth_redirect_attempt') !== 'true') {
             return;
         }
-        
-        // API Call
+        sessionStorage.removeItem('auth_redirect_attempt');
+        showLoading();
+        setGoogleButtonState(true, 'Google සැසිය පරික්ෂා කරමින්...');
         try {
-            const response = await fetch(`\${apiBaseUrl}/auth/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ email, password, remember_me: rememberMe }),
-                credentials: 'include'
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                handleLoginSuccess(data, rememberMe);
-            } else {
-                handleApiError(data, response.status);
-                enableSubmitButton();
+            const result = await firebaseAuth.getRedirectResult();
+            if (result && result.user) {
+                const idToken = await result.user.getIdToken(true);
+                const backendResponse = await apiRequest('/auth/google-login', {
+                    method: 'POST',
+                    body: JSON.stringify({ id_token: idToken })
+                });
+                const backendData = await backendResponse.json();
+                if (backendResponse.ok) {
+                    processLoginSuccess(backendData, true);
+                } else {
+                    processLoginApiError(backendData, backendResponse.status);
+                }
             }
         } catch (error) {
-            handleNetworkError(error);
-            enableSubmitButton();
+            console.error("Google Redirect Result Error:", error);
+            if (error.code !== 'auth/no-redirect-operation') { // Ignore "no redirect operation" error
+                 showGlobalMessage('Failed to process Google Sign-In redirect: ' + error.message, 'error', true);
+            }
+        } finally {
+            hideLoading();
+            setGoogleButtonState(false, 'Google සමඟින් පිවිසෙන්න');
         }
-    });
-    
-    // Helper Functions
+    }
+
+    function handleFirebaseError(errorCode, baseMessage = '') {
+        let specificMessage = '';
+        switch(errorCode) {
+            case 'auth/popup-closed-by-user': specificMessage = 'පිවිසුම් කවුළුව ඔබ විසින් වසා දමන ලදී.'; break;
+            case 'auth/popup-blocked': specificMessage = 'Pop-up was blocked by the browser. Please allow pop-ups for this site.'; break;
+            case 'auth/network-request-failed': specificMessage = 'A network error occurred. Please check your internet connection.'; break;
+            case 'auth/cancelled-popup-request': specificMessage = 'Multiple pop-up requests. Please try again.'; break;
+            case 'auth/user-disabled': specificMessage = 'This Google account has been disabled.'; break;
+            case 'auth/unauthorized-domain': specificMessage = 'This domain is not authorized for Google Sign-In.'; break;
+            default: specificMessage = 'An unexpected error occurred (' + errorCode + ').';
+        }
+        showGlobalMessage(baseMessage + specificMessage, 'error', true);
+    }
+
+    // --- 4. UI and State Management Functions ---
     function validateInputs(email, password) {
         let isValid = true;
-        clearMessages(); // Clear previous errors first
-        
         if (!email) {
-            showInputError(emailErrorEl, 'ඊමේල් ලිපිනය අවශ්‍යයි.');
+            showInputError(emailErrorEl, 'ඊමේල් ලිපිනය අනිවාර්යයි.');
             isValid = false;
-        } else if (!isValidEmail(email)) {
+        } else if (!isValidEmail(email)) { // from utils.js
             showInputError(emailErrorEl, 'කරුණාකර වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.');
             isValid = false;
         }
-        
         if (!password) {
-            showInputError(passwordErrorEl, 'මුරපදය අවශ්‍යයි.');
+            showInputError(passwordErrorEl, 'මුරපදය අනිවාර්යයි.');
             isValid = false;
         }
+        // Add password complexity checks here if desired for login, though usually for registration
         return isValid;
     }
-    
-    function handleLoginSuccess(data, rememberMe) {
-        showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
-        handleTokenStorage(data, rememberMe);
-        
-        // Check if MFA is required
-        if (data.mfa_required && data.mfa_methods?.length > 0) {
-            // Redirect to MFA page
-            setTimeout(() => { 
-                window.location.href = `mfa.php?methods=\${data.mfa_methods.join(',')}`; 
-            }, 1000);
-            return;
-        }
-        
-        // Get the redirect URL if available, otherwise use dashboard
-        const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-        
-        if (redirectAfterLogin) {
-            // Clear the redirect URL before navigating
-            sessionStorage.removeItem('redirectAfterLogin');
-            setTimeout(() => { window.location.href = redirectAfterLogin; }, 1000);
-        } else {
-            // Default to dashboard
-            setTimeout(() => { window.location.href = REDIRECT_URL; }, 1000);
-        }
-    }
-    
-    function handleTokenStorage(data, rememberMe) {
-        const storage = rememberMe ? localStorage : sessionStorage;
-        const otherStorage = rememberMe ? sessionStorage : localStorage; // For clearing opposite storage
-        
+
+    function processLoginSuccess(data, rememberMe) {
+        // Store tokens according to "remember me"
+        const storageTarget = rememberMe ? localStorage : sessionStorage;
+        const otherStorage = rememberMe ? sessionStorage : localStorage;
+
         if (data.access_token) {
-            sessionStorage.setItem('auth_token', data.access_token); // Access token always in session storage
+            sessionStorage.setItem('auth_token', data.access_token); // Access token always in session
             if (data.expires_in) {
                 const expiryTime = Date.now() + (data.expires_in * 1000);
                 sessionStorage.setItem('token_expiry', expiryTime.toString());
             }
-        }
-        
-        if (data.refresh_token) {
-            storage.setItem('refresh_token', data.refresh_token); // Store refresh token based on rememberMe
-            otherStorage.removeItem('refresh_token'); // Clear from the other storage
         } else {
-            // Ensure refresh token is cleared if not provided
+            console.error("Login success response missing access_token.", data);
+            showGlobalMessage("Login successful, but token not received. Please contact support.", "error", true);
+            return;
+        }
+
+        if (data.refresh_token) {
+            storageTarget.setItem('refresh_token', data.refresh_token);
+            otherStorage.removeItem('refresh_token');
+        } else {
             localStorage.removeItem('refresh_token');
             sessionStorage.removeItem('refresh_token');
         }
-        
+
         if (data.user_id) {
-            storage.setItem('user_id', data.user_id);
+            storageTarget.setItem('user_id', data.user_id);
             otherStorage.removeItem('user_id');
         } else {
-            // Ensure user ID is cleared if not provided
             localStorage.removeItem('user_id');
             sessionStorage.removeItem('user_id');
         }
-    }
-    
-    function handleApiError(responseData, status) {
-        let errorMessage = 'ඇතුල් වීමට නොහැක. ';
-        if (responseData?.detail) {
-            if (typeof responseData.detail === 'string') {
-                if (responseData.detail.includes('Invalid email or password') || responseData.detail.includes('INVALID_LOGIN_CREDENTIALS')) {
-                    errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
-                    showInputError(emailErrorEl, ' '); emailInput.focus();
-                    showInputError(passwordErrorEl, ' ');
-                } else if (responseData.detail.includes('Account temporarily locked')) {
-                    errorMessage = responseData.detail; // Show lockout message from API
-                } else if (responseData.detail.includes('Account disabled')) {
-                    errorMessage = 'ඔබගේ ගිණුම අක්‍රිය කර ඇත.';
-                } else {
-                    errorMessage += responseData.detail;
-                }
-            } else {
-                errorMessage += JSON.stringify(responseData.detail);
-            }
+        
+        startAutomaticTokenRefresh(); // From utils.js
+
+        if (data.mfa_required && Array.isArray(data.mfa_methods) && data.mfa_methods.length > 0) {
+            showGlobalMessage('Two-Factor Authentication required. Redirecting...', 'success', false);
+            setTimeout(() => {
+                window.location.href = \`mfa.php?methods=\${encodeURIComponent(data.mfa_methods.join(','))}\`;
+            }, 1200);
         } else {
-            errorMessage += `සේවාදායකයේ දෝෂයක් (කේතය: \${status})`;
+            showGlobalMessage('Login successful! Redirecting to your dashboard...', 'success', false);
+            const redirectTarget = sessionStorage.getItem('redirectAfterLogin') || DEFAULT_REDIRECT_AFTER_LOGIN; // DEFAULT_REDIRECT_AFTER_LOGIN from utils.js
+            sessionStorage.removeItem('redirectAfterLogin');
+            setTimeout(() => { window.location.href = redirectTarget; }, 1200);
         }
-        showMessage(errorMessage, 'error');
     }
-    
-    function handleNetworkError(error) {
-        console.error('Login Fetch Error:', error);
-        showMessage('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සහ කරන්න.', 'error');
-    }
-    
-    function showMessage(msg, type) {
-        messageArea.textContent = msg;
-        // Base classes + type specific classes
-        let typeClasses = 'border ';
-        if (type === 'success') {
-            typeClasses += 'bg-green-50 border-green-300 text-green-700';
-        } else if (type === 'error') {
-            typeClasses += 'bg-red-50 border-red-300 text-red-700';
-        } else { // Info or default
-            typeClasses += 'bg-blue-50 border-blue-300 text-blue-700';
+
+    function processLoginApiError(responseData, status) {
+        let errorMessage = 'Login failed. ';
+        if (responseData?.detail) {
+            const detail = responseData.detail;
+            if (typeof detail === 'string') {
+                if (detail.toLowerCase().includes('invalid email or password') || detail.includes('INVALID_LOGIN_CREDENTIALS')) {
+                    errorMessage = 'Invalid email or password. Please check your credentials.';
+                    showInputError(emailErrorEl, ' '); // Trigger red border
+                    showInputError(passwordErrorEl, ' '); // Trigger red border
+                    emailInput.focus();
+                } else if (detail.toLowerCase().includes('account temporarily locked')) {
+                    errorMessage = 'Account temporarily locked due to too many failed attempts. Please try again later.';
+                } else if (detail.toLowerCase().includes('account disabled')) {
+                    errorMessage = 'Your account has been disabled. Please contact support.';
+                } else if (detail.toLowerCase().includes('email not verified')) {
+                    errorMessage = 'Your email address is not verified. Please check your inbox or spam folder for a verification email. You might need to <a href="resend-verification.php" class="font-semibold underline hover:text-kdj-red">request a new one</a>.';
+                } else {
+                    errorMessage += sanitizeHTML(detail);
+                }
+            } else if (Array.isArray(detail)) { // Handle FastAPI/Pydantic validation errors
+                errorMessage = detail.map(err => \`\${err.loc.join('.')} - \${sanitizeHTML(err.msg)}\`).join('; ');
+            } else {
+                errorMessage += sanitizeHTML(JSON.stringify(detail));
+            }
+        } else if (status === 429) { // Too Many Requests
+             errorMessage = 'Too many login attempts. Please try again in a few minutes.';
+        } else {
+            errorMessage += \`A server error occurred (Status: \${status}). Please try again.\`;
         }
-        messageArea.className = `my-6 p-3 rounded-md text-center font-medium text-sm \${typeClasses}`;
+        showGlobalMessage(errorMessage, 'error', true); // Show as toast as well
+    }
+
+    function showGlobalMessage(msg, type = 'error', useToast = false) {
+        if (!messageArea) return;
+        messageArea.innerHTML = msg; // Use innerHTML if message contains HTML (like links)
+        messageArea.className = 'my-5 p-4 rounded-lg text-center font-semibold text-sm border-2'; // Base classes
+        messageArea.classList.add(type); // 'error' or 'success' class for styling
         messageArea.style.display = 'block';
+        messageArea.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        if (useToast) {
+            showToast(messageArea.textContent, type); // Show a toast with the text content
+        }
     }
-    
+
+    function clearGlobalMessages() {
+        if (messageArea) {
+            messageArea.style.display = 'none';
+            messageArea.textContent = '';
+            messageArea.className = 'my-5 p-4 rounded-lg text-center font-semibold text-sm hidden border-2';
+        }
+    }
+
     function showInputError(element, message) {
         if (!element) return;
-        element.textContent = message;
+        element.textContent = sanitizeHTML(message); // Sanitize from utils.js
         element.style.display = 'block';
-        const input = element.closest('div')?.querySelector('input'); // Find input in parent div
-        if (input) {
-            input.classList.add('border-red-500'); // Add red border
-            input.classList.remove('focus:border-kdj-red','focus:ring-kdj-red'); // Remove default focus
-            input.classList.add('focus:border-red-500','focus:ring-red-500'); // Add red focus
+        const inputField = element.previousElementSibling?.querySelector('input'); // More specific query
+        if (inputField) {
+            inputField.classList.add('border-red-500', 'focus:border-red-600', 'focus:ring-red-600');
+            inputField.classList.remove('border-gray-300','focus:border-kdj-red', 'focus:ring-kdj-red');
+            inputField.setAttribute('aria-invalid', 'true');
+            inputField.setAttribute('aria-describedby', element.id);
         }
     }
-    
-    function clearMessages() {
-        messageArea.style.display = 'none';
-        messageArea.textContent = '';
-        if (emailErrorEl) emailErrorEl.style.display = 'none';
-        if (passwordErrorEl) passwordErrorEl.style.display = 'none';
-        
-        // Remove red borders and restore default focus
+
+    function clearInputErrors() {
+        [emailErrorEl, passwordErrorEl].forEach(el => {
+            if (el) {
+                el.style.display = 'none';
+                el.textContent = '';
+            }
+        });
         [emailInput, passwordInput].forEach(input => {
-            input?.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
-            input?.classList.add('focus:border-kdj-red', 'focus:ring-kdj-red');
+            if (input) {
+                input.classList.remove('border-red-500', 'focus:border-red-600', 'focus:ring-red-600');
+                input.classList.add('border-gray-300','focus:border-kdj-red', 'focus:ring-kdj-red');
+                input.removeAttribute('aria-invalid');
+                input.removeAttribute('aria-describedby');
+            }
         });
     }
-    
-    function disableSubmitButton(text) {
-        submitButton.disabled = true;
-        buttonText.textContent = text;
-        // Add spinner using font awesome
-        submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i><span>\${text}</span>`;
-    }
-    
-    function enableSubmitButton() {
-        submitButton.disabled = false;
-        // Restore original button text/structure
-        submitButton.innerHTML = `<span id="buttonText">ඇතුල් වන්න</span>`;
-    }
-    
-    function isValidEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(String(email).toLowerCase());
-    }
-    
-    // Save referrer information for redirecting back after login
-    document.addEventListener('DOMContentLoaded', function() {
-        // Check referrer to see if it's from an internal site we should redirect back to
-        const referrer = document.referrer;
-        
-        if (referrer && (
-            referrer.includes('events.kdj.lk') || 
-            referrer.includes('singlish.kdj.lk')
-        )) {
-            // If referred from one of our other sites, store it for redirect after login
-            sessionStorage.setItem('redirectAfterLogin', referrer);
+
+    function setSubmitButtonState(isLoading, text = 'ඇතුල් වන්න') {
+        if (submitButton && buttonText && buttonSpinner) {
+            submitButton.disabled = isLoading;
+            buttonText.textContent = text;
+            buttonSpinner.style.display = isLoading ? 'inline-block' : 'none';
         }
-        
-        // Check for any Firebase auth redirect results
-        checkRedirectResult();
-        
-        // First check if user is already logged in, redirect to dashboard
-        const authToken = sessionStorage.getItem('auth_token');
-        if (authToken) {
-            // Verify token is valid
-            fetch(`\${apiBaseUrl}/users/me`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer \${authToken}`
-                },
-                credentials: 'include'
-            })
-            .then(response => {
-                if (response.ok) {
-                    // Check if there's a specific redirect URL in sessionStorage
-                    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-                    
-                    if (redirectAfterLogin) {
-                        // User is logged in, redirect to the saved URL
-                        sessionStorage.removeItem('redirectAfterLogin');
-                        window.location.href = redirectAfterLogin;
-                    } else {
-                        // No saved redirect, go to dashboard
-                        window.location.href = REDIRECT_URL;
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Auth check error:', error);
-                // Token may be invalid, let user login again
-            });
+    }
+    function setGoogleButtonState(isLoading, text = 'Google සමඟින් පිවිසෙන්න') {
+         if (googleSignInButton && googleButtonText && googleButtonSpinner) {
+            googleSignInButton.disabled = isLoading;
+            googleButtonText.textContent = text;
+            googleButtonSpinner.style.display = isLoading ? 'inline-block' : 'none';
         }
-    });
-    
-    // Show or hide loading indicator
-    function showLoading() {
-        document.getElementById('loadingIndicator').style.display = 'flex';
     }
-    
-    function hideLoading() {
-        document.getElementById('loadingIndicator').style.display = 'none';
-    }
+});
 </script>
 HTML;
 
-// Include footer
-include 'footer.php';
+include 'footer.php'; // Includes utils.js and then the $additional_scripts above
 ?>
