@@ -161,62 +161,93 @@
         // Check if user is logged in on protected pages
         function checkUserAuth() {
             const protectedPages = [
-                'dashboard.php', 
-                'profile.php', 
+                'dashboard.php',
+                'profile.php',
                 'settings.php',
                 'security.php'
             ];
-            
             const currentPage = window.location.pathname.split('/').pop();
-            
+
             if (protectedPages.includes(currentPage)) {
-                // Check for auth token
                 const authToken = sessionStorage.getItem('auth_token');
-                
+
                 if (!authToken) {
                     // No token, redirect to login page
-                    // Store current URL for redirect after login
                     sessionStorage.setItem('redirectAfterLogin', window.location.href);
                     window.location.href = '/index.php';
-                    return;
+                    return; // Body remains hidden by default
                 }
-                
+
                 // Verify token by making an API call
                 const headers = {
                     'Accept': 'application/json',
                     'Authorization': `Bearer ${authToken}`
                 };
-                
+
                 fetch('https://auth.kdj.lk/api/v1/users/me', {
                     method: 'GET',
                     credentials: 'include',
                     headers: headers
                 })
                 .then(response => {
-                    if (!response.ok) {
+                    if (response.ok) {
+                        document.body.style.display = 'block'; // Show body on successful auth
+                    } else {
                         // Try to refresh the token
                         refreshAuthToken().then(refreshed => {
                             if (!refreshed) {
                                 // Clear session storage
                                 sessionStorage.removeItem('auth_token');
                                 sessionStorage.removeItem('token_expiry');
-                                
-                                // Save current URL for redirect after login
+                                localStorage.removeItem('refresh_token');
+                                sessionStorage.removeItem('refresh_token');
+                                localStorage.removeItem('user_id');
+                                sessionStorage.removeItem('user_id');
+
                                 sessionStorage.setItem('redirectAfterLogin', window.location.href);
-                                
-                                // Redirect to login page
-                                window.location.href = '/index.php';
+                                window.location.href = '/index.php'; // Body remains hidden
+                            } else {
+                                // Token was refreshed. Re-fetch user data or assume OK for now.
+                                // For simplicity, show body. Page-specific JS will load data.
+                                document.body.style.display = 'block'; // Show body
+                                // It's good practice to re-verify or have page JS use the new token for its data load.
                             }
                         });
                     }
                 })
                 .catch(error => {
                     console.error('Auth check error:', error);
-                    // Redirect to login page
-                    window.location.href = '/index.php';
+                    sessionStorage.removeItem('auth_token');
+                    sessionStorage.removeItem('token_expiry');
+                    localStorage.removeItem('refresh_token');
+                    sessionStorage.removeItem('refresh_token');
+                    localStorage.removeItem('user_id');
+                    sessionStorage.removeItem('user_id');
+                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
+                    window.location.href = '/index.php'; // Body remains hidden
                 });
+            } else {
+                // Not a protected page, show the body.
+                // This handles pages like 404.php, 500.php or any public pages not in auth flow.
+                // Auth flow pages (index, register etc.) are handled in DOMContentLoaded directly.
+                const authFlowPages = ['index.php', 'register.php', 'forgot_password.php', 'reset_password.php', 'verify-email.php', 'mfa.php'];
+                if (!authFlowPages.includes(currentPage)) {
+                    document.body.style.display = 'block';
+                }
             }
         }
+
+        // Run auth check on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const authFlowPages = ['index.php', 'register.php', 'forgot_password.php', 'reset_password.php', 'verify-email.php', 'mfa.php'];
+            const currentPage = window.location.pathname.split('/').pop();
+
+            // Auth flow pages should always be visible immediately.
+            if (authFlowPages.includes(currentPage)) {
+                document.body.style.display = 'block';
+            }
+            checkUserAuth(); // This will handle protected pages and other non-auth-flow pages.
+        });
 
         // Refresh auth token function
         async function refreshAuthToken() {
