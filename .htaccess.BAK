@@ -16,34 +16,25 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     # Prevent clickjacking
     Header set X-Frame-Options "SAMEORIGIN"
     
-    # Content Security Policy - Strengthened
-    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.kdj.lk; connect-src 'self' https://*.kdj.lk https://auth.kdj.lk; frame-src https://accounts.google.com; object-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests;"
+    # Content Security Policy
+    Header set Content-Security-Policy "default-src 'self' *.kdj.lk; script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net cdnjs.cloudflare.com unpkg.com; style-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: *.kdj.lk; connect-src 'self' *.kdj.lk;"
     
-    # HTTP Strict Transport Security (HSTS) - Increased max-age
-    Header set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+    # HTTP Strict Transport Security (HSTS)
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
     
     # Referrer Policy
     Header set Referrer-Policy "strict-origin-when-cross-origin"
     
-    # Permissions Policy (formerly Feature-Policy)
-    Header set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), battery=(), sync-xhr=(), accelerometer=(), gyroscope=(), magnetometer=(), midi=(), ambient-light-sensor=(), autoplay=()"
+    # Permissions Policy
+    Header set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
     
     # Remove PHP version from response headers
     Header unset X-Powered-By
-    
-    # Cache-Control for HTML documents
-    <FilesMatch "\.(html|php)$">
-        Header set Cache-Control "no-cache, no-store, must-revalidate"
-        Header set Pragma "no-cache"
-        Header set Expires "0"
-    </FilesMatch>
 </IfModule>
 
 # Custom error pages
-ErrorDocument 400 /errors/400.php
-ErrorDocument 401 /errors/401.php
-ErrorDocument 403 /errors/403.php
 ErrorDocument 404 /404.php
+ErrorDocument 403 /404.php
 ErrorDocument 500 /500.php
 
 # Protect files from browsing
@@ -56,20 +47,18 @@ ErrorDocument 500 /500.php
 Options -Indexes
 
 # Protect sensitive files
-<FilesMatch "(^\.htaccess|\.env|\.git|\.htpasswd|composer\.json|composer\.lock|package\.json|package-lock\.json|config\.php)">
+<FilesMatch "(^\.htaccess|\.env|\.git|\.htpasswd)">
     Order allow,deny
     Deny from all
 </FilesMatch>
 
-# Block access to sensitive directories
-<DirectoryMatch "/(\.git|\.github|node_modules|vendor)/">
-    Deny from all
-</DirectoryMatch>
-
 # PHP settings
-<IfModule mod_php8.c>
+<IfModule mod_php7.c>
     # Disable register globals
     php_flag register_globals off
+    
+    # Magic quotes
+    php_flag magic_quotes_gpc off
     
     # Secure PHP configuration
     php_value max_execution_time 60
@@ -84,10 +73,6 @@ Options -Indexes
     php_value session.cookie_secure 1
     php_value session.use_strict_mode 1
     php_value session.cookie_samesite "Lax"
-    php_value session.gc_maxlifetime 3600
-    
-    # Disable potentially dangerous PHP functions
-    php_value disable_functions "exec,passthru,shell_exec,system,proc_open,popen,curl_exec,curl_multi_exec,parse_ini_file,show_source"
 </IfModule>
 
 # Cache control for static files
@@ -100,7 +85,6 @@ Options -Indexes
     ExpiresByType image/gif "access plus 1 year"
     ExpiresByType image/svg+xml "access plus 1 year"
     ExpiresByType image/webp "access plus 1 year"
-    ExpiresByType image/avif "access plus 1 year"
     
     # CSS, JavaScript
     ExpiresByType text/css "access plus 1 month"
@@ -119,54 +103,44 @@ Options -Indexes
 
 # Compress text files
 <IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json application/xml image/svg+xml
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json application/xml
 </IfModule>
 
 # Cross-domain access for fonts
 <IfModule mod_headers.c>
-    <FilesMatch "\.(ttf|ttc|otf|eot|woff|woff2|font\.css)$">
+    <FilesMatch "\.(ttf|ttc|otf|eot|woff|woff2|font.css)$">
         Header set Access-Control-Allow-Origin "*.kdj.lk"
     </FilesMatch>
 </IfModule>
-
-# Prevent access to backup and text files
-<FilesMatch "\.(bak|config|sql|ini|log|sh|inc|swp|dist|md|lock)$">
-    Order allow,deny
-    Deny from all
-    Satisfy All
-</FilesMatch>
 
 # Pretty URLs (remove .php extension)
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f
 RewriteRule ^(.*)$ $1.php [L]
 
-# Route mappings
+# Redirect /login to index.php
 RewriteRule ^login$ index.php [L]
-RewriteRule ^register$ register.php [L]
-RewriteRule ^forgot-password$ forgot_password.php [L]
-RewriteRule ^reset-password$ reset_password.php [L]
-RewriteRule ^verify-email$ verify-email.php [L]
-RewriteRule ^dashboard$ dashboard.php [L]
-RewriteRule ^profile$ profile.php [L]
-RewriteRule ^settings$ settings.php [L]
-RewriteRule ^security$ security.php [L]
-RewriteRule ^sessions$ sessions.php [L]
-RewriteRule ^api-tokens$ api_tokens.php [L]
-RewriteRule ^notifications$ notifications.php [L]
 
-# Rate limiting (requires mod_ratelimit, uncomment if available)
-# <IfModule mod_ratelimit.c>
-#     <Location "/login">
-#         SetOutputFilter RATE_LIMIT
-#         SetEnv rate-limit 5
-#     </Location>
-#     <Location "/register">
-#         SetOutputFilter RATE_LIMIT
-#         SetEnv rate-limit 3
-#     </Location>
-#     <Location "/forgot-password">
-#         SetOutputFilter RATE_LIMIT
-#         SetEnv rate-limit 3
-#     </Location>
-# </IfModule>
+# Redirect /register to register.php
+RewriteRule ^register$ register.php [L]
+
+# Redirect /forgot-password to forgot_password.php
+RewriteRule ^forgot-password$ forgot_password.php [L]
+
+# Redirect /reset-password to reset_password.php
+RewriteRule ^reset-password$ reset_password.php [L]
+
+# Redirect /verify-email to verify_email.php
+RewriteRule ^verify-email$ verify-email.php [L]
+
+# Redirect /dashboard to dashboard.php
+RewriteRule ^dashboard$ dashboard.php [L]
+
+# Redirect /profile to profile.php
+RewriteRule ^profile$ profile.php [L]
+
+# Redirect /settings to settings.php
+RewriteRule ^settings$ settings.php [L]
+
+# Redirect /security to security.php
+RewriteRule ^security$ security.php [L]
