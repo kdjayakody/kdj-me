@@ -371,34 +371,44 @@ $additional_scripts = <<<HTML
     async function loadUserProfile() {
         try {
             showLoading();
-            
+            const authToken = sessionStorage.getItem('auth_token'); // Token එක sessionStorage එකෙන් ලබාගන්න
+
+            const headers = {
+                'Accept': 'application/json'
+            };
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`; // Authorization header එක මෙතනදි එකතු කරන්න
+            }
+
             const response = await fetch(`\${apiBaseUrl}/users/me`, {
                 method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                },
-                credentials: 'include'
+                headers: headers, // යාවත්කාලීන වූ headers මෙතන භාවිතා කරන්න
+                credentials: 'include' // Cookies යැවීම සඳහා (අවශ්‍ය නම්)
             });
-            
+
             if (!response.ok) {
-                throw new Error('Failed to fetch profile');
+                // මෙතනදිත් 401 ආවොත්, ඒ කියන්නේ checkUserAuth එකෙන් පසුවත් token එක අවලංගු වෙලා
+                // නැත්නම් වෙනත් ගැටළුවක්.
+                console.error(`Failed to fetch profile from profile.php's loadUserProfile. Status: ${response.status}`);
+                throw new Error('Failed to fetch profile'); //මෙමගින් catch block එකට යයි
             }
-            
+
             userData = await response.json();
-            
+
             // Update profile form
             updateProfileForm(userData);
-            
+
             // Update account info
             updateAccountInfo(userData);
-            
+
             hideLoading();
         } catch (error) {
             hideLoading();
-            console.error('Failed to load user profile:', error);
-            showToast('Failed to load profile data. Please try refreshing the page.', 'error');
+            console.error('Failed to load user profile:', error); // දෝෂය console එකේ පෙන්වයි
+            showToast('Failed to load profile data. Please try refreshing the page.', 'error'); // රතු පාටින් දෝෂ පණිවිඩය පෙන්වයි
         }
     }
+
     
     // Update profile form with user data
     function updateProfileForm(user) {
