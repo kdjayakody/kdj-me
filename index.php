@@ -396,29 +396,16 @@ $additional_scripts = <<<HTML
     }
     
     function handleLoginSuccess(data, rememberMe) {
-    showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
-    handleTokenStorage(data, rememberMe);
-    
-    // මුලින්ම MFA අවශ්‍යයි ද කියලා චෙක් කරමු
-    if (data.mfa_required && data.mfa_methods?.length > 0) {
-        setTimeout(() => { window.location.href = `mfa.php?methods=${data.mfa_methods.join(',')}`; }, 1000);
-        return;
+        showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
+        handleTokenStorage(data, rememberMe);
+        
+        // Redirect based on MFA status
+        const redirectTarget = (data.mfa_required && data.mfa_methods?.length > 0)
+            ? `mfa.php?methods=\${data.mfa_methods.join(',')}` // MFA page
+            : REDIRECT_URL; // Dashboard
+        
+        setTimeout(() => { window.location.href = redirectTarget; }, 1000);
     }
-    
-    // ඊළඟට කලින් save කරපු referrer URL එකක් තියෙනවද කියලා චෙක් කරමු
-    const savedRedirect = sessionStorage.getItem('redirectAfterLogin');
-    
-    if (savedRedirect) {
-        // ආපු තැනටම යොමු කරමු
-        setTimeout(() => { 
-            sessionStorage.removeItem('redirectAfterLogin'); // ඉවත් කරමු
-            window.location.href = savedRedirect; 
-        }, 1000);
-    } else {
-        // නැත්නම් dashboard එකට යොමු කරමු
-        setTimeout(() => { window.location.href = REDIRECT_URL; }, 1000);
-    }
-}
     
     function handleTokenStorage(data, rememberMe) {
         const storage = rememberMe ? localStorage : sessionStorage;
@@ -540,14 +527,6 @@ $additional_scripts = <<<HTML
     
     // Check for redirect after login and verify logged-in state
     document.addEventListener('DOMContentLoaded', function() {
-         // පරිශීලකයා ආපු තැන (referrer) චෙක් කරමු
-    const referrer = document.referrer;
-    
-    // referrer එක events.kdj.lk හෝ singlish.kdj.lk ද කියලා චෙක් කරමු
-    if (referrer && (referrer.includes('events.kdj.lk') || referrer.includes('singlish.kdj.lk'))) {
-        // referrer එක sessionStorage එකේ save කරමු
-        sessionStorage.setItem('redirectAfterLogin', referrer);
-    }
         // Check for any Firebase auth redirect results
         checkRedirectResult();
         
