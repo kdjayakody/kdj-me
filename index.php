@@ -1,14 +1,134 @@
 <?php
-// Check if user is already logged in
-$auth_token = isset($_COOKIE['auth_token']) ? $_COOKIE['auth_token'] : '';
-if (empty($auth_token)) {
-    // Check for token in session storage via JavaScript
-    echo "<script>
-        if (sessionStorage.getItem('auth_token')) {
-            window.location.href = 'dashboard.php';
-        }
-    </script>";
-}
+// Handle redirects for already logged in users
+echo "<script>
+    // Check client-side storages for auth tokens
+    if (sessionStorage.getItem('auth_token') || localStorage.getItem('refresh_token')) {
+        // Verify token with API
+        const checkAuthState = async () => {
+            // Try with auth_token from sessionStorage
+            const authToken = sessionStorage.getItem('auth_token');
+            
+            if (authToken) {
+                try {
+                    // Attempt to validate token with API
+                    const response = await fetch('https://auth.kdj.lk/api/v1/users/me', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Authorization': 'Bearer ' + authToken
+                        },
+                        credentials: 'include'
+                    });
+                    
+                    if (response.ok) {
+                        // Token is valid, redirect to dashboard
+                        const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                        if (redirectAfterLogin) {
+                            sessionStorage.removeItem('redirectAfterLogin');
+                            window.location.href = redirectAfterLogin;
+                        } else {
+                            window.location.href = 'dashboard.php';
+                        }
+                        return;
+                    } 
+                    
+                    // If token validation failed, try to refresh
+                    const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token');
+                    if (refreshToken) {
+                        const refreshResponse = await fetch('https://auth.kdj.lk/api/v1/auth/refresh-token', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ refresh_token: refreshToken }),
+                            credentials: 'include'
+                        });
+                        
+                        if (refreshResponse.ok) {
+                            const data = await refreshResponse.json();
+                            if (data.access_token) {
+                                // Store the new token
+                                sessionStorage.setItem('auth_token', data.access_token);
+                                
+                                // Update expiry time
+                                if (data.expires_in) {
+                                    const expiryTime = Date.now() + (data.expires_in * 1000);
+                                    sessionStorage.setItem('token_expiry', expiryTime.toString());
+                                }
+                                
+                                // Store refresh token if provided
+                                if (data.refresh_token) {
+                                    if (localStorage.getItem('refresh_token')) {
+                                        localStorage.setItem('refresh_token', data.refresh_token);
+                                    } else {
+                                        sessionStorage.setItem('refresh_token', data.refresh_token);
+                                    }
+                                }
+                                
+                                // Redirect after successful token refresh
+                                const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                                if (redirectAfterLogin) {
+                                    sessionStorage.removeItem('redirectAfterLogin');
+                                    window.location.href = redirectAfterLogin;
+                                } else {
+                                    window.location.href = 'dashboard.php';
+                                }
+                                return;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Auth check error:', error);
+                    // Continue to login page if error
+                }
+            } else if (localStorage.getItem('refresh_token')) {
+                // Try to use refresh token if available
+                const refreshToken = localStorage.getItem('refresh_token');
+                try {
+                    const refreshResponse = await fetch('https://auth.kdj.lk/api/v1/auth/refresh-token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ refresh_token: refreshToken }),
+                        credentials: 'include'
+                    });
+                    
+                    if (refreshResponse.ok) {
+                        const data = await refreshResponse.json();
+                        if (data.access_token) {
+                            // Store the new token
+                            sessionStorage.setItem('auth_token', data.access_token);
+                            
+                            // Update expiry time
+                            if (data.expires_in) {
+                                const expiryTime = Date.now() + (data.expires_in * 1000);
+                                sessionStorage.setItem('token_expiry', expiryTime.toString());
+                            }
+                            
+                            // Redirect after successful token refresh
+                            const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                            if (redirectAfterLogin) {
+                                sessionStorage.removeItem('redirectAfterLogin');
+                                window.location.href = redirectAfterLogin;
+                            } else {
+                                window.location.href = 'dashboard.php';
+                            }
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Refresh token error:', error);
+                    // Continue to login page if error
+                }
+            }
+        };
+        
+        checkAuthState();
+    }
+</script>";
 
 // Set page specific variables
 $title = "Login";
@@ -569,38 +689,8 @@ $additional_scripts = <<<HTML
         // Check for any Firebase auth redirect results
         checkRedirectResult();
         
-        // First check if user is already logged in, redirect to dashboard
-        const authToken = sessionStorage.getItem('auth_token');
-        if (authToken) {
-            // Verify token is valid
-            fetch(`\${apiBaseUrl}/users/me`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer \${authToken}`
-                },
-                credentials: 'include'
-            })
-            .then(response => {
-                if (response.ok) {
-                    // Check if there's a specific redirect URL in sessionStorage
-                    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-                    
-                    if (redirectAfterLogin) {
-                        // User is logged in, redirect to the saved URL
-                        sessionStorage.removeItem('redirectAfterLogin');
-                        window.location.href = redirectAfterLogin;
-                    } else {
-                        // No saved redirect, go to dashboard
-                        window.location.href = REDIRECT_URL;
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Auth check error:', error);
-                // Token may be invalid, let user login again
-            });
-        }
+        // Auth check already performed at the top of the page
+        // This prevents duplicate auth checks
     });
     
     // Show or hide loading indicator
