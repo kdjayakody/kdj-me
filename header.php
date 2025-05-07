@@ -8,6 +8,9 @@ function isPage($page) {
     return ($current_page == $page);
 }
 
+// Check if this is an authentication page
+$is_auth_page = in_array($current_page, ['index.php', 'register.php', 'forgot_password.php', 'reset_password.php', 'verify-email.php', 'mfa.php']);
+
 // Default meta values
 $page_title = "KDJ Lanka";
 $page_description = "KDJ Lanka - Digital Solutions for Sri Lanka";
@@ -44,6 +47,8 @@ if (isset($description)) {
     <meta property="og:image" content="/assets/images/kdj-og-image.jpg">
     <meta property="og:site_name" content="KDJ Lanka">
     
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="<?php echo session_id(); ?>">
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -66,52 +71,57 @@ if (isset($description)) {
         }
     </script>
 
-<!-- Firebase initialization -->
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <!-- Firebase initialization - only on auth pages -->
+    <?php if ($is_auth_page): ?>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
 
-<script>
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyCJFdKtU5AGhDpsTvhWCXh8AaoQ8M4Frt4",
-  authDomain: "kdj-lanka.firebaseapp.com",
-  databaseURL: "https://kdj-lanka-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "kdj-lanka",
-  storageBucket: "kdj-lanka.appspot.com",
-  messagingSenderId: "812675960947",
-  appId: "1:812675960947:web:bc57a1d19da73b9ac51a06",
-  measurementId: "G-GGFCJZXE9T"
-  };
+    <script>
+      // Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyCJFdKtU5AGhDpsTvhWCXh8AaoQ8M4Frt4",
+        authDomain: "kdj-lanka.firebaseapp.com",
+        databaseURL: "https://kdj-lanka-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "kdj-lanka",
+        storageBucket: "kdj-lanka.appspot.com",
+        messagingSenderId: "812675960947",
+        appId: "1:812675960947:web:bc57a1d19da73b9ac51a06",
+        measurementId: "G-GGFCJZXE9T"
+      };
 
-  // Initialize Firebase
-  let firebaseApp;
-  let firebaseAuth;
-  
-  try {
-    // Initialize Firebase with config
-    firebaseApp = firebase.initializeApp(firebaseConfig);
-    firebaseAuth = firebase.auth(firebaseApp);
-    
-    // Set persistence to session (clears when window/tab closes)
-    firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
-      .then(() => {
-        console.log("Firebase Auth Persistence set to SESSION");
-      })
-      .catch((error) => {
-        console.error("Error setting auth persistence:", error);
-      });
+      // Initialize Firebase
+      let firebaseApp;
+      let firebaseAuth;
       
-    console.log("Firebase Initialized Successfully!");
-  } catch (e) {
-    console.error("Error initializing Firebase:", e);
-  }
-</script>
+      try {
+        // Initialize Firebase with config
+        firebaseApp = firebase.initializeApp(firebaseConfig);
+        firebaseAuth = firebase.auth(firebaseApp);
+        
+        // Set persistence to session (clears when window/tab closes)
+        firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+          .then(() => {
+            console.log("Firebase Auth Persistence set to SESSION");
+          })
+          .catch((error) => {
+            console.error("Error setting auth persistence:", error);
+          });
+          
+        console.log("Firebase Initialized Successfully!");
+      } catch (e) {
+        console.error("Error initializing Firebase:", e);
+      }
+    </script>
+    <?php endif; ?>
     
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Common JavaScript utilities -->
+    <script src="/assets/js/utils.js"></script>
     
     <!-- Custom CSS -->
     <style>
@@ -147,14 +157,14 @@ if (isset($description)) {
     
     <?php if (isset($additional_head)) echo $additional_head; ?>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 min-h-screen flex flex-col">
     <!-- Loading Indicator -->
     <div id="loadingIndicator" class="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-white bg-opacity-80 z-50" style="display: none;">
         <div class="loader h-16 w-16 border-4 border-gray-200 rounded-full"></div>
     </div>
 
     <!-- Main Navigation - Only show on non-auth pages -->
-    <?php if (!in_array($current_page, ['index.php', 'register.php', 'forgot_password.php', 'reset_password.php'])): ?>
+    <?php if (!$is_auth_page): ?>
     <nav class="bg-kdj-dark text-white shadow-lg">
         <div class="container mx-auto px-4">
             <div class="flex justify-between">
@@ -177,6 +187,9 @@ if (isset($description)) {
                         <a href="/settings.php" class="py-4 px-2 <?php echo isPage('settings.php') ? 'text-kdj-red border-b-2 border-kdj-red font-bold' : 'text-gray-300 hover:text-kdj-red transition duration-300'; ?>">
                             Settings
                         </a>
+                        <a href="/security.php" class="py-4 px-2 <?php echo isPage('security.php') ? 'text-kdj-red border-b-2 border-kdj-red font-bold' : 'text-gray-300 hover:text-kdj-red transition duration-300'; ?>">
+                            Security
+                        </a>
                     </div>
                 </div>
                 <!-- Secondary Nav -->
@@ -192,6 +205,9 @@ if (isset($description)) {
                             </a>
                             <a href="/settings.php" class="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                                 <i class="fas fa-cog mr-2"></i> Settings
+                            </a>
+                            <a href="/security.php" class="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                                <i class="fas fa-shield-alt mr-2"></i> Security
                             </a>
                             <hr class="my-1">
                             <button id="logoutBtn" class="w-full text-left block px-4 py-2 text-kdj-red hover:bg-gray-100">
@@ -213,9 +229,11 @@ if (isset($description)) {
             <a href="/dashboard.php" class="block py-2 px-4 text-sm <?php echo isPage('dashboard.php') ? 'bg-gray-700 text-kdj-red' : 'hover:bg-gray-700'; ?>">Dashboard</a>
             <a href="/profile.php" class="block py-2 px-4 text-sm <?php echo isPage('profile.php') ? 'bg-gray-700 text-kdj-red' : 'hover:bg-gray-700'; ?>">Profile</a>
             <a href="/settings.php" class="block py-2 px-4 text-sm <?php echo isPage('settings.php') ? 'bg-gray-700 text-kdj-red' : 'hover:bg-gray-700'; ?>">Settings</a>
+            <a href="/security.php" class="block py-2 px-4 text-sm <?php echo isPage('security.php') ? 'bg-gray-700 text-kdj-red' : 'hover:bg-gray-700'; ?>">Security</a>
             <button id="mobileLogoutBtn" class="w-full text-left block py-2 px-4 text-sm text-kdj-red hover:bg-gray-700">Logout</button>
         </div>
     </nav>
     <?php endif; ?>
 
-    <div class="toast-container fixed top-4 right-4 z-50" id="toastContainer"></div>
+    <!-- Toast container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50"></div>

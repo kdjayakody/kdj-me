@@ -12,24 +12,48 @@ const REDIRECT_AFTER_LOGIN = 'dashboard.php';
  * Display a toast notification
  * 
  * @param {string} message - The message to display
- * @param {string} type - The type of toast: 'success', 'error', or 'info'
+ * @param {string} type - The type of toast: 'success', 'error', 'warning', or 'info'
  * @param {number} duration - Duration in milliseconds to show the toast
  */
 function showToast(message, type = 'success', duration = 5000) {
-    const toastContainer = document.getElementById('toastContainer');
+    // Get or create toast container
+    let toastContainer = document.getElementById('toastContainer');
     if (!toastContainer) {
-        // Create toast container if it doesn't exist
-        const container = document.createElement('div');
-        container.id = 'toastContainer';
-        container.className = 'fixed top-4 right-4 z-50';
-        document.body.appendChild(container);
-        toastContainer = container;
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toastContainer';
+        toastContainer.className = 'fixed top-4 right-4 z-50';
+        document.body.appendChild(toastContainer);
     }
     
+    // Create toast element
     const toast = document.createElement('div');
-    toast.className = `mb-3 p-4 rounded-lg shadow-lg text-white ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'} transform transition-all duration-300 translate-x-full`;
     
-    const iconClass = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+    // Set appropriate color based on type
+    let bgColor, textColor, iconClass;
+    switch(type) {
+        case 'success':
+            bgColor = 'bg-green-500';
+            textColor = 'text-white';
+            iconClass = 'fa-check-circle';
+            break;
+        case 'error':
+            bgColor = 'bg-red-500';
+            textColor = 'text-white';
+            iconClass = 'fa-exclamation-circle';
+            break;
+        case 'warning':
+            bgColor = 'bg-yellow-500';
+            textColor = 'text-white';
+            iconClass = 'fa-exclamation-triangle';
+            break;
+        case 'info':
+        default:
+            bgColor = 'bg-blue-500';
+            textColor = 'text-white';
+            iconClass = 'fa-info-circle';
+    }
+    
+    toast.className = `mb-3 p-4 rounded-lg shadow-lg ${textColor} ${bgColor} transform transition-all duration-300 translate-x-full`;
     
     toast.innerHTML = `
         <div class="flex items-center">
@@ -144,7 +168,9 @@ function validatePasswordStrength(password) {
     
     return {
         valid: errors.length === 0,
-        errors: errors
+        errors: errors,
+        score: (hasUppercase ? 1 : 0) + (hasLowercase ? 1 : 0) + (hasDigits ? 1 : 0) + 
+               (hasSpecialChars ? 1 : 0) + (password.length >= minLength ? 1 : 0)
     };
 }
 
@@ -196,6 +222,21 @@ function getTimeBasedGreeting() {
 }
 
 /**
+ * Update greeting on page elements
+ */
+function updatePageGreeting() {
+    const greeting = getTimeBasedGreeting();
+    const elements = [
+        document.getElementById('sidebarGreeting'),
+        document.getElementById('mobileSidebarGreeting')
+    ];
+    
+    elements.forEach(el => {
+        if (el) el.textContent = greeting;
+    });
+}
+
+/**
  * Make an API request with proper error handling
  * 
  * @param {string} endpoint - The API endpoint (will be appended to API_BASE_URL)
@@ -205,6 +246,7 @@ function getTimeBasedGreeting() {
  */
 async function apiRequest(endpoint, options = {}, includeCredentials = true) {
     try {
+        // Create default headers
         const defaultHeaders = {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
@@ -216,6 +258,7 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
             defaultHeaders['Authorization'] = `Bearer ${authToken}`;
         }
         
+        // Create fetch config
         const config = {
             ...options,
             headers: {
@@ -244,6 +287,7 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         config.signal = controller.signal;
         
+        // Make the request
         const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
         clearTimeout(timeoutId); // Clear timeout on successful response
         
@@ -269,26 +313,14 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
                 
                 if (retryResponse.status === 401) {
                     // Still unauthorized after token refresh, redirect to login
-                    sessionStorage.removeItem('auth_token');
-                    sessionStorage.removeItem('token_expiry');
-                    sessionStorage.removeItem('refresh_token');
-                    
-                    // Save current URL to redirect back after login
-                    sessionStorage.setItem('redirectAfterLogin', window.location.href);
-                    window.location.href = '/index.php';
+                    handleAuthFailure();
                     throw new Error('Session expired. Please log in again.');
                 }
                 
                 return retryResponse;
             } else {
                 // Token refresh failed, redirect to login
-                sessionStorage.removeItem('auth_token');
-                sessionStorage.removeItem('token_expiry');
-                sessionStorage.removeItem('refresh_token');
-                
-                // Save current URL to redirect back after login
-                sessionStorage.setItem('redirectAfterLogin', window.location.href);
-                window.location.href = '/index.php';
+                handleAuthFailure();
                 throw new Error('Session expired. Please log in again.');
             }
         }
@@ -302,6 +334,23 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
         console.error(`API call to ${endpoint} failed:`, error);
         throw error;
     }
+}
+
+/**
+ * Handle authentication failure by clearing tokens and redirecting to login
+ */
+function handleAuthFailure() {
+    // Clear all authentication data
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('token_expiry');
+    sessionStorage.removeItem('refresh_token');
+    localStorage.removeItem('refresh_token');
+    
+    // Save current URL to redirect back after login
+    sessionStorage.setItem('redirectAfterLogin', window.location.href);
+    
+    // Redirect to login page
+    window.location.href = '/index.php';
 }
 
 /**
@@ -321,7 +370,8 @@ function isTokenExpiringSoon() {
  * @returns {Promise<boolean>} True if refresh was successful
  */
 async function refreshAuthToken() {
-    const refreshToken = sessionStorage.getItem('refresh_token');
+    // Try to get refresh token from session storage first, then local storage
+    const refreshToken = sessionStorage.getItem('refresh_token') || localStorage.getItem('refresh_token');
     if (!refreshToken) return false;
     
     try {
@@ -354,7 +404,12 @@ async function refreshAuthToken() {
             
             // Store refresh token if provided
             if (data.refresh_token) {
-                sessionStorage.setItem('refresh_token', data.refresh_token);
+                // Keep it in the same storage it was found in
+                if (localStorage.getItem('refresh_token')) {
+                    localStorage.setItem('refresh_token', data.refresh_token);
+                } else {
+                    sessionStorage.setItem('refresh_token', data.refresh_token);
+                }
             }
             
             return true;
@@ -412,6 +467,9 @@ function getCSRFToken() {
  */
 async function checkUserAuthentication() {
     try {
+        const authToken = sessionStorage.getItem('auth_token');
+        if (!authToken) return null;
+        
         const response = await apiRequest('/users/me', {
             method: 'GET'
         });
@@ -429,6 +487,7 @@ async function checkUserAuthentication() {
 
 /**
  * Redirect user to login page if not authenticated
+ * @returns {Promise<object|null>} - The user data if logged in, null otherwise
  */
 async function requireAuthentication() {
     const userData = await checkUserAuthentication();
@@ -436,12 +495,13 @@ async function requireAuthentication() {
         // Save current URL to redirect back after login
         sessionStorage.setItem('redirectAfterLogin', window.location.href);
         window.location.href = 'index.php';
+        return null;
     }
     return userData;
 }
 
 /**
- * Handle logout
+ * Handle common logout functionality
  */
 async function handleLogout() {
     showLoading();
@@ -451,11 +511,8 @@ async function handleLogout() {
             method: 'POST'
         });
         
-        // Clear session storage regardless of response
-        sessionStorage.removeItem('auth_token');
-        sessionStorage.removeItem('token_expiry');
-        sessionStorage.removeItem('refresh_token');
-        localStorage.removeItem('user_id');
+        // Clear all auth data regardless of response
+        clearAuthData();
         
         if (response.ok) {
             // Redirect to login page
@@ -474,11 +531,8 @@ async function handleLogout() {
     } catch (error) {
         console.error('Logout error:', error);
         
-        // Clear session storage anyway
-        sessionStorage.removeItem('auth_token');
-        sessionStorage.removeItem('token_expiry');
-        sessionStorage.removeItem('refresh_token');
-        localStorage.removeItem('user_id');
+        // Clear auth data anyway
+        clearAuthData();
         
         showToast('Network error during logout. You have been logged out locally.', 'warning');
         
@@ -488,6 +542,55 @@ async function handleLogout() {
         }, 2000);
         
         hideLoading();
+    }
+}
+
+/**
+ * Clear all authentication data from storage
+ */
+function clearAuthData() {
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('token_expiry');
+    sessionStorage.removeItem('refresh_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_id');
+}
+
+/**
+ * Store authentication tokens after login
+ * @param {object} data - The response data from login API
+ * @param {boolean} rememberMe - Whether to remember the user
+ */
+function storeAuthData(data, rememberMe) {
+    // Access token always goes in session storage
+    if (data.access_token) {
+        sessionStorage.setItem('auth_token', data.access_token);
+        
+        // Store token expiry if provided
+        if (data.expires_in) {
+            const expiryTime = Date.now() + (data.expires_in * 1000);
+            sessionStorage.setItem('token_expiry', expiryTime.toString());
+        }
+    }
+    
+    // Refresh token goes in localStorage if rememberMe, otherwise sessionStorage
+    if (data.refresh_token) {
+        if (rememberMe) {
+            localStorage.setItem('refresh_token', data.refresh_token);
+            sessionStorage.removeItem('refresh_token');
+        } else {
+            sessionStorage.setItem('refresh_token', data.refresh_token);
+            localStorage.removeItem('refresh_token');
+        }
+    }
+    
+    // Store user ID if provided
+    if (data.user_id) {
+        if (rememberMe) {
+            localStorage.setItem('user_id', data.user_id);
+        } else {
+            sessionStorage.setItem('user_id', data.user_id);
+        }
     }
 }
 
@@ -520,21 +623,197 @@ function updateSecurityScore(userData, scoreBar, scoreText, scoreMessage) {
     }
 }
 
-// Set up automatic token refresh check every 5 minutes
-setInterval(async () => {
-    if (isTokenExpiringSoon()) {
-        await refreshAuthToken();
+/**
+ * Initialize mobile sidebar functionality
+ */
+function initMobileSidebar() {
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
+    const closeMobileSidebar = document.getElementById('closeMobileSidebar');
+    
+    if (!mobileSidebarToggle || !mobileSidebar || !mobileSidebarContent) return;
+    
+    mobileSidebarToggle.addEventListener('click', function() {
+        mobileSidebar.classList.remove('hidden');
+        setTimeout(() => {
+            mobileSidebarContent.classList.remove('-translate-x-full');
+        }, 10);
+    });
+    
+    const closeSidebar = function() {
+        mobileSidebarContent.classList.add('-translate-x-full');
+        setTimeout(() => {
+            mobileSidebar.classList.add('hidden');
+        }, 300);
+    };
+    
+    if (closeMobileSidebar) {
+        closeMobileSidebar.addEventListener('click', closeSidebar);
     }
-}, 300000); // 5 minutes
+    
+    mobileSidebar.addEventListener('click', function(e) {
+        if (e.target === mobileSidebar) {
+            closeSidebar();
+        }
+    });
+}
 
-// Initialize common functionality
-document.addEventListener('DOMContentLoaded', function() {
+/**
+ * Initialize logout buttons
+ */
+function initLogoutButtons() {
+    // Get all logout buttons
+    const logoutButtons = [
+        document.getElementById('logoutBtn'),
+        document.getElementById('mobileLogoutBtn'),
+        document.getElementById('sidebarLogoutBtn'),
+        document.getElementById('mobileSidebarLogoutBtn')
+    ];
+    
+    // Add click event to all existing logout buttons
+    logoutButtons.forEach(btn => {
+        if (btn) {
+            btn.addEventListener('click', handleLogout);
+        }
+    });
+}
+
+/**
+ * Setup password toggles (show/hide password)
+ */
+function setupPasswordToggles() {
+    const toggles = document.querySelectorAll('.password-toggle');
+    
+    toggles.forEach(toggle => {
+        toggle.addEventListener('click', function() {
+            const input = this.closest('div').querySelector('input');
+            if (!input) return;
+            
+            const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+            input.setAttribute('type', type);
+            
+            const icon = this.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-eye');
+                icon.classList.toggle('fa-eye-slash');
+            }
+        });
+    });
+}
+
+/**
+ * Initialize the password strength meter
+ * @param {HTMLElement} passwordInput - The password input element
+ * @param {HTMLElement} strengthMeter - The strength meter element
+ * @param {Object} requirements - Object containing requirement elements
+ */
+function initPasswordStrengthMeter(passwordInput, strengthMeter, requirements) {
+    if (!passwordInput || !strengthMeter || !requirements) return;
+    
+    passwordInput.addEventListener('input', function() {
+        const password = this.value;
+        const result = validatePasswordStrength(password);
+        const maxScore = 5;
+        
+        // Update requirement indicators
+        if (requirements.length && 'querySelector' in requirements.length) {
+            updateRequirement(requirements.length, password.length >= 12);
+        }
+        if (requirements.uppercase && 'querySelector' in requirements.uppercase) {
+            updateRequirement(requirements.uppercase, /[A-Z]/.test(password));
+        }
+        if (requirements.lowercase && 'querySelector' in requirements.lowercase) {
+            updateRequirement(requirements.lowercase, /[a-z]/.test(password));
+        }
+        if (requirements.number && 'querySelector' in requirements.number) {
+            updateRequirement(requirements.number, /\d/.test(password));
+        }
+        if (requirements.special && 'querySelector' in requirements.special) {
+            updateRequirement(requirements.special, /[!@#$%^&*(),.?":{}|<>]/.test(password));
+        }
+        
+        // Update strength meter
+        const percentage = (result.score / maxScore) * 100;
+        strengthMeter.style.width = `${percentage}%`;
+        
+        // Update color based on strength
+        if (percentage < 40) {
+            strengthMeter.className = 'password-strength-meter bg-red-500';
+        } else if (percentage < 80) {
+            strengthMeter.className = 'password-strength-meter bg-yellow-500';
+        } else {
+            strengthMeter.className = 'password-strength-meter bg-green-500';
+        }
+    });
+    
+    function updateRequirement(element, isFulfilled) {
+        const icon = element.querySelector('i');
+        if (!icon) return;
+        
+        if (isFulfilled) {
+            icon.className = 'fas fa-check-circle text-green-500 mr-1';
+        } else {
+            icon.className = 'fas fa-times-circle text-red-500 mr-1';
+        }
+    }
+}
+
+/**
+ * Initialize common page functionalities
+ */
+function initCommonPageFunctions() {
     // Set up CSRF token if not already set
     if (!sessionStorage.getItem('csrf_token')) {
         sessionStorage.setItem('csrf_token', generateCSRFToken());
     }
     
+    // Update greetings
+    updatePageGreeting();
+    
+    // Initialize mobile sidebar
+    initMobileSidebar();
+    
+    // Initialize logout buttons
+    initLogoutButtons();
+    
+    // Set up password toggles
+    setupPasswordToggles();
+    
+    // Run auth check on protected pages
+    checkAuthForProtectedPages();
+    
     // Redirect to appropriate page after login if specified
+    handleRedirectAfterLogin();
+    
+    // Set up automatic token refresh check every 5 minutes
+    setInterval(async () => {
+        if (isTokenExpiringSoon()) {
+            await refreshAuthToken();
+        }
+    }, 300000); // 5 minutes
+}
+
+/**
+ * Check if current page is a protected page and verify authentication
+ */
+function checkAuthForProtectedPages() {
+    const protectedPages = [
+        'dashboard.php', 'profile.php', 'settings.php', 'security.php'
+    ];
+    
+    const currentPage = window.location.pathname.split('/').pop();
+    
+    if (protectedPages.includes(currentPage)) {
+        // Check if user is authenticated
+        requireAuthentication();
+    }
+}
+
+/**
+ * Handle redirect after login if there's a saved URL
+ */
+function handleRedirectAfterLogin() {
     const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
     if (redirectAfterLogin && window.location.pathname.includes('index.php')) {
         // Check if already logged in
@@ -546,4 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-});
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initCommonPageFunctions);

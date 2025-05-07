@@ -85,13 +85,13 @@ include 'header.php';
                 </li>
                 
                 <li>
-                    <a href="https://singlish.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                    <a href="https://singlish.kdj.lk" target="_blank" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
                         <i class="fas fa-language w-5 h-5 mr-3 text-gray-500"></i>
                         <span>KDJ Singlish</span>
                     </a>
                 </li>
                 <li>
-                    <a href="https://events.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                    <a href="https://events.kdj.lk" target="_blank" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
                         <i class="fas fa-calendar-alt w-5 h-5 mr-3 text-gray-500"></i>
                         <span>KDJ Events</span>
                     </a>
@@ -170,13 +170,13 @@ include 'header.php';
                     </li>
                     
                     <li>
-                        <a href="https://singlish.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <a href="https://singlish.kdj.lk" target="_blank" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
                             <i class="fas fa-language w-5 h-5 mr-3 text-gray-500"></i>
                             <span>KDJ Singlish</span>
                         </a>
                     </li>
                     <li>
-                        <a href="https://events.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <a href="https://events.kdj.lk" target="_blank" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
                             <i class="fas fa-calendar-alt w-5 h-5 mr-3 text-gray-500"></i>
                             <span>KDJ Events</span>
                         </a>
@@ -202,8 +202,8 @@ include 'header.php';
                     <p class="text-gray-600">Welcome to your KDJ Lanka account dashboard</p>
                 </div>
                 
-                <div class="mt-4 md:mt-0 flex items-center">
-                    <span class="bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full flex items-center">
+                <div class="mt-4 md:mt-0 flex items-center space-x-2">
+                    <span id="accountStatus" class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
                         <span class="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
                         Active Account
                     </span>
@@ -305,7 +305,7 @@ include 'header.php';
                         </div>
                     </div>
                     <p class="text-gray-600 text-sm mb-4">Sinhala-English translation and language tools.</p>
-                    <a href="https://singlish.kdj.lk" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium flex items-center">
+                    <a href="https://singlish.kdj.lk" target="_blank" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium flex items-center">
                         Access Singlish
                         <i class="fas fa-external-link-alt ml-2"></i>
                     </a>
@@ -319,7 +319,7 @@ include 'header.php';
                         </div>
                     </div>
                     <p class="text-gray-600 text-sm mb-4">Discover and register for upcoming events in Sri Lanka.</p>
-                    <a href="https://events.kdj.lk" class="text-pink-600 hover:text-pink-800 text-sm font-medium flex items-center">
+                    <a href="https://events.kdj.lk" target="_blank" class="text-pink-600 hover:text-pink-800 text-sm font-medium flex items-center">
                         Explore Events
                         <i class="fas fa-external-link-alt ml-2"></i>
                     </a>
@@ -335,252 +335,88 @@ $additional_scripts = <<<HTML
 <script>
     // Configuration
     const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
-
-    const API_BASE_URL = 'https://auth.kdj.lk';
     
-    // User profile data
-    let userData = null;
+    // DOM elements
+    const profileName = document.getElementById('profileName');
+    const profileEmail = document.getElementById('profileEmail');
+    const profilePhone = document.getElementById('profilePhone');
+    const profileMFA = document.getElementById('profileMFA');
+    const emailVerificationBadge = document.getElementById('emailVerificationBadge');
+    const accountStatus = document.getElementById('accountStatus');
     
-    // Set greeting based on time of day
-    function setGreeting() {
-        const hour = new Date().getHours();
-        let greeting = '';
-        
-        if (hour < 12) {
-            greeting = 'සුභ උදෑසනක්';
-        } else if (hour < 17) {
-            greeting = 'සුභ දහවලක්';
-        } else {
-            greeting = 'සුභ සන්ධ්‍යාවක්';
-        }
-        
-        document.getElementById('sidebarGreeting').textContent = greeting;
-        document.getElementById('mobileSidebarGreeting').textContent = greeting;
-    }
-    
-    // Check if token expiration time is coming up
-    function isTokenExpiringSoon() {
-        const tokenExpiry = sessionStorage.getItem('token_expiry');
-        if (!tokenExpiry) return true;
-        
-        // Check if token expires in the next 5 minutes (300000 ms)
-        return parseInt(tokenExpiry) - 300000 < Date.now();
-    }
-    
-    // Refresh auth token
-    async function refreshAuthToken() {
-        const refreshToken = sessionStorage.getItem('refresh_token');
-        if (!refreshToken) return false;
-        
-        try {
-            const response = await fetch(`\${apiBaseUrl}/auth/refresh-token`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ refresh_token: refreshToken }),
-                credentials: 'include'
-            });
-            
-            if (!response.ok) {
-                console.error('Failed to refresh token:', response.status);
-                return false;
-            }
-            
-            const data = await response.json();
-            
-            if (data.access_token) {
-                // Store the new token
-                sessionStorage.setItem('auth_token', data.access_token);
-                
-                // Update expiry time
-                if (data.expires_in) {
-                    const expiryTime = Date.now() + (data.expires_in * 1000);
-                    sessionStorage.setItem('token_expiry', expiryTime.toString());
-                }
-                
-                // Store refresh token if provided
-                if (data.refresh_token) {
-                    sessionStorage.setItem('refresh_token', data.refresh_token);
-                }
-                
-                return true;
-            }
-            
-            return false;
-        } catch (error) {
-            console.error('Token refresh error:', error);
-            return false;
-        }
-    }
-    
-    // Load user profile data with token refresh
+    // Load user profile data
     async function loadUserProfile() {
         try {
-            // Check if token needs refresh
-            if (isTokenExpiringSoon()) {
-                const refreshed = await refreshAuthToken();
-                if (!refreshed) {
-                    // If refresh failed and we're not on login page, redirect
-                    if (!window.location.pathname.includes('index.php')) {
-                        console.log("Token refresh failed, redirecting to login");
-                        window.location.href = '/index.php';
-                        return;
-                    }
-                }
-            }
+            // First check authentication
+            await requireAuthentication();
             
             showLoading();
             
-            // Get auth token from session storage
-            const authToken = sessionStorage.getItem('auth_token');
-            
-            // Prepare headers with token if available
-            const headers = {
-                'Accept': 'application/json'
-            };
-            
-            if (authToken) {
-                headers['Authorization'] = `Bearer ${authToken}`;
-            }
-            const response = await fetch(`\${apiBaseUrl}/users/me`, {
-                method: 'GET',
-                credentials: 'include',
-                headers: headers
+            // Make API request to get user data
+            const response = await apiRequest('/users/me', {
+                method: 'GET'
             });
             
             if (!response.ok) {
-                if (response.status === 401) {
-                    // Clear session storage if unauthorized
-                    sessionStorage.removeItem('auth_token');
-                    sessionStorage.removeItem('token_expiry');
-                    
-                    // Redirect to login
-                    window.location.href = '/index.php';
-                    return;
-                }
-                
                 throw new Error('Failed to fetch profile');
             }
             
-            userData = await response.json();
+            const userData = await response.json();
             
-            // Update sidebar with user name
-            document.getElementById('sidebarUserName').textContent = userData.display_name || userData.email;
-            document.getElementById('mobileSidebarUserName').textContent = userData.display_name || userData.email;
-            
-            // Update profile display
-            updateProfileDisplay(userData);
+            // Update UI with user data
+            updateUI(userData);
             
             hideLoading();
         } catch (error) {
-            hideLoading();
             console.error('Failed to load user profile:', error);
+            hideLoading();
             showToast('Failed to load profile data. Please try refreshing the page.', 'error');
-            
-            // If there's an auth error, redirect to login
-            if (error.message.includes('authentication') || error.message.includes('auth')) {
-                window.location.href = '/index.php';
-            }
         }
     }
     
-    // Update profile display with user data
-    function updateProfileDisplay(user) {
-        // Update header nav
+    // Update UI with user data
+    function updateUI(userData) {
+        // Update sidebar and mobile sidebar
+        document.getElementById('sidebarUserName').textContent = userData.display_name || userData.email;
+        document.getElementById('mobileSidebarUserName').textContent = userData.display_name || userData.email;
+        
+        // Update profile section
+        profileName.textContent = userData.display_name || 'No name set';
+        profileEmail.textContent = userData.email;
+        
+        if (userData.phone_number) {
+            profilePhone.textContent = userData.phone_number;
+        } else {
+            profilePhone.textContent = 'Not set';
+        }
+        
+        // Update MFA status
+        profileMFA.textContent = userData.mfa_enabled ? 'MFA: Enabled' : 'MFA: Disabled';
+        
+        // Update email verification badge
+        if (!userData.email_verified) {
+            emailVerificationBadge.classList.remove('hidden');
+            // Update account status color
+            accountStatus.className = 'bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center';
+            accountStatus.innerHTML = '<span class="h-2 w-2 bg-yellow-500 rounded-full mr-1"></span>Pending Verification';
+        } else {
+            emailVerificationBadge.classList.add('hidden');
+        }
+        
+        // Update header username if present
         const userDisplayName = document.getElementById('userDisplayName');
         if (userDisplayName) {
-            userDisplayName.textContent = user.display_name || user.email;
-        }
-        
-        // Update profile summary elements
-        const profileName = document.getElementById('profileName');
-        const profileEmail = document.getElementById('profileEmail');
-        const profilePhone = document.getElementById('profilePhone');
-        const profileMFA = document.getElementById('profileMFA');
-        
-        if (profileName) profileName.textContent = user.display_name || 'No name set';
-        if (profileEmail) profileEmail.textContent = user.email;
-        
-        if (profilePhone) {
-            if (user.phone_number) {
-                profilePhone.textContent = user.phone_number;
-            } else {
-                profilePhone.textContent = 'Not set';
-            }
-        }
-        
-        if (profileMFA) {
-            profileMFA.textContent = user.mfa_enabled ? 'MFA: Enabled' : 'MFA: Disabled';
-        }
-        
-        // Email verification badge
-        const emailVerificationBadge = document.getElementById('emailVerificationBadge');
-        if (emailVerificationBadge) {
-            if (!user.email_verified) {
-                emailVerificationBadge.classList.remove('hidden');
-            } else {
-                emailVerificationBadge.classList.add('hidden');
-            }
+            userDisplayName.textContent = userData.display_name || userData.email;
         }
     }
     
-    // Mobile sidebar toggle
-    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
-    const mobileSidebar = document.getElementById('mobileSidebar');
-    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
-    const closeMobileSidebar = document.getElementById('closeMobileSidebar');
-    
-    mobileSidebarToggle.addEventListener('click', function() {
-        mobileSidebar.classList.remove('hidden');
-        setTimeout(() => {
-            mobileSidebarContent.classList.remove('-translate-x-full');
-        }, 10);
-    });
-    
-    function closeSidebar() {
-        mobileSidebarContent.classList.add('-translate-x-full');
-        setTimeout(() => {
-            mobileSidebar.classList.add('hidden');
-        }, 300);
-    }
-    
-    closeMobileSidebar.addEventListener('click', closeSidebar);
-    
-    mobileSidebar.addEventListener('click', function(e) {
-        if (e.target === mobileSidebar) {
-            closeSidebar();
-        }
-    });
-    
-    // Sidebar logout
-    const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
-    const mobileSidebarLogoutBtn = document.getElementById('mobileSidebarLogoutBtn');
-    
-    function handleSidebarLogout() {
-        handleLogout();
-    }
-    
-    if (sidebarLogoutBtn) {
-        sidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
-    }
-    
-    if (mobileSidebarLogoutBtn) {
-        mobileSidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
-    }
-    
-    // Initialize
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
-        setGreeting();
-        loadUserProfile();
+        // Update time-based greeting
+        updatePageGreeting();
         
-        // Set up a periodic token refresh check every 5 minutes
-        setInterval(async () => {
-            if (isTokenExpiringSoon()) {
-                await refreshAuthToken();
-            }
-        }, 300000); // 5 minutes
+        // Load user profile data
+        loadUserProfile();
     });
 </script>
 HTML;

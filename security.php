@@ -54,13 +54,13 @@ include 'header.php';
                 </li>
                 
                 <li>
-                    <a href="https://singlish.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                    <a href="https://singlish.kdj.lk" target="_blank" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
                         <i class="fas fa-language w-5 h-5 mr-3 text-gray-500"></i>
                         <span>KDJ Singlish</span>
                     </a>
                 </li>
                 <li>
-                    <a href="https://events.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                    <a href="https://events.kdj.lk" target="_blank" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
                         <i class="fas fa-calendar-alt w-5 h-5 mr-3 text-gray-500"></i>
                         <span>KDJ Events</span>
                     </a>
@@ -139,13 +139,13 @@ include 'header.php';
                     </li>
                     
                     <li>
-                        <a href="https://singlish.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <a href="https://singlish.kdj.lk" target="_blank" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
                             <i class="fas fa-language w-5 h-5 mr-3 text-gray-500"></i>
                             <span>KDJ Singlish</span>
                         </a>
                     </li>
                     <li>
-                        <a href="https://events.kdj.lk" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
+                        <a href="https://events.kdj.lk" target="_blank" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-md">
                             <i class="fas fa-calendar-alt w-5 h-5 mr-3 text-gray-500"></i>
                             <span>KDJ Events</span>
                         </a>
@@ -221,7 +221,7 @@ include 'header.php';
                     </div>
                     
                     <div class="border-t border-gray-200 pt-6">
-                        <div class="bg-yellow-50 p-4 rounded-md">
+                        <div id="securityScoreContainer" class="bg-yellow-50 p-4 rounded-md">
                             <div class="flex">
                                 <div class="flex-shrink-0">
                                     <i class="fas fa-shield-alt text-yellow-400"></i>
@@ -380,14 +380,14 @@ include 'header.php';
                                 <div class="text-mono text-sm bg-white p-2 rounded border border-gray-300">Loading...</div>
                             </div>
                             
-                            <div class="flex justify-center">
+                            <div class="flex flex-wrap justify-center gap-3">
                                 <button id="downloadBackupCodesBtn" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-kdj-red">
                                     <i class="fas fa-download mr-1.5"></i> Download Codes
                                 </button>
-                                <button id="copyBackupCodesBtn" class="ml-3 inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-kdj-red">
+                                <button id="copyBackupCodesBtn" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-kdj-red">
                                     <i class="far fa-copy mr-1.5"></i> Copy All Codes
                                 </button>
-                                <button id="printBackupCodesBtn" class="ml-3 inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-kdj-red">
+                                <button id="printBackupCodesBtn" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-kdj-red">
                                     <i class="fas fa-print mr-1.5"></i> Print Codes
                                 </button>
                             </div>
@@ -476,84 +476,63 @@ $additional_scripts = <<<HTML
     // Configuration
     const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
     
-    // User profile data
+    // User data
     let userData = null;
     let mfaData = null;
+    let backupCodes = [];
     
-    // DOM elements
-    const setupMfaBtn = document.getElementById('setupMfaBtn');
-    const cancelMfaSetupBtn = document.getElementById('cancelMfaSetupBtn');
-    const verifyMfaForm = document.getElementById('verifyMfaForm');
-    const verifyMfaBtn = document.getElementById('verifyMfaBtn');
-    const disableMfaBtn = document.getElementById('disableMfaBtn');
-    const disableMfaModal = document.getElementById('disableMfaModal');
-    const cancelDisableMfaBtn = document.getElementById('cancelDisableMfaBtn');
-    const confirmDisableMfaBtn = document.getElementById('confirmDisableMfaBtn');
-    const disableMfaPassword = document.getElementById('disableMfaPassword');
-    const copySetupKeyBtn = document.getElementById('copySetupKeyBtn');
-    const downloadBackupCodesBtn = document.getElementById('downloadBackupCodesBtn');
-    const copyBackupCodesBtn = document.getElementById('copyBackupCodesBtn');
-    const printBackupCodesBtn = document.getElementById('printBackupCodesBtn');
-    
-    // Different view states
+    // DOM elements for MFA states
     const mfaDisabledState = document.getElementById('mfaDisabledState');
     const mfaSetupState = document.getElementById('mfaSetupState');
     const mfaEnabledState = document.getElementById('mfaEnabledState');
     
-    // Status indicators
+    // DOM elements for MFA setup/verification
+    const setupMfaBtn = document.getElementById('setupMfaBtn');
+    const qrCode = document.getElementById('qrCode');
+    const setupKey = document.getElementById('setupKey');
+    const verifyMfaForm = document.getElementById('verifyMfaForm');
+    const verificationCode = document.getElementById('verificationCode');
+    const verifyMfaBtn = document.getElementById('verifyMfaBtn');
+    const cancelMfaSetupBtn = document.getElementById('cancelMfaSetupBtn');
+    const copySetupKeyBtn = document.getElementById('copySetupKeyBtn');
+    
+    // DOM elements for MFA enabled state
+    const backupCodesContainer = document.getElementById('backupCodesContainer');
+    const downloadBackupCodesBtn = document.getElementById('downloadBackupCodesBtn');
+    const copyBackupCodesBtn = document.getElementById('copyBackupCodesBtn');
+    const printBackupCodesBtn = document.getElementById('printBackupCodesBtn');
+    const disableMfaBtn = document.getElementById('disableMfaBtn');
+    
+    // DOM elements for security indicators
     const emailVerifiedIndicator = document.getElementById('emailVerifiedIndicator');
     const strongPasswordIndicator = document.getElementById('strongPasswordIndicator');
     const mfaEnabledIndicator = document.getElementById('mfaEnabledIndicator');
     const recentLoginIndicator = document.getElementById('recentLoginIndicator');
+    const lastLoginText = document.getElementById('lastLoginText');
     const mfaStatusBadge = document.getElementById('mfaStatusBadge');
     const mfaStatusText = document.getElementById('mfaStatusText');
-    const lastLoginText = document.getElementById('lastLoginText');
     const securityScoreBar = document.getElementById('securityScoreBar');
     const securityScoreText = document.getElementById('securityScoreText');
     const securityScoreMessage = document.getElementById('securityScoreMessage');
+    const securityScoreContainer = document.getElementById('securityScoreContainer');
     
-    // Set greeting based on time of day
-    function setGreeting() {
-        const hour = new Date().getHours();
-        let greeting = '';
-        
-        if (hour < 12) {
-            greeting = 'සුභ උදෑසනක්';
-        } else if (hour < 17) {
-            greeting = 'සුභ දහවලක්';
-        } else {
-            greeting = 'සුභ සන්ධ්‍යාවක්';
-        }
-        
-        document.getElementById('sidebarGreeting').textContent = greeting;
-        document.getElementById('mobileSidebarGreeting').textContent = greeting;
-    }
+    // DOM elements for disable MFA modal
+    const disableMfaModal = document.getElementById('disableMfaModal');
+    const disableMfaPassword = document.getElementById('disableMfaPassword');
+    const cancelDisableMfaBtn = document.getElementById('cancelDisableMfaBtn');
+    const confirmDisableMfaBtn = document.getElementById('confirmDisableMfaBtn');
     
-    // Format date for display
-    function formatDate(dateString) {
-        if (!dateString) return 'Never';
-        
-        const date = new Date(dateString);
-        return date.toLocaleString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-    
-    // Load user profile data
+    // Load user profile with security information
     async function loadUserProfile() {
         try {
+            // First check authentication
+            await requireAuthentication();
+            
             showLoading();
             
-            const response = await fetch(`\${apiBaseUrl}/users/me`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                },
-                credentials: 'include'
+            // Make API request to get user data
+            const response = await apiRequest('/users/me', {
+                method: 'GET'
             });
             
             if (!response.ok) {
@@ -562,21 +541,25 @@ $additional_scripts = <<<HTML
             
             userData = await response.json();
             
-            // Update sidebar with user name
+            // Update sidebar with user info
             document.getElementById('sidebarUserName').textContent = userData.display_name || userData.email;
             document.getElementById('mobileSidebarUserName').textContent = userData.display_name || userData.email;
+            
+            // Update greeting
+            updatePageGreeting();
             
             // Update security overview
             updateSecurityOverview(userData);
             
-            // Update MFA status
+            // Update MFA state based on user data
             if (userData.mfa_enabled) {
+                await loadBackupCodes();
                 updateMfaEnabledState();
             } else {
                 updateMfaDisabledState();
             }
             
-            // Load login activity (in a real app this would come from an API)
+            // Load login activity
             loadLoginActivity();
             
             hideLoading();
@@ -589,7 +572,7 @@ $additional_scripts = <<<HTML
     
     // Update security overview based on user data
     function updateSecurityOverview(user) {
-        // Email verification status
+        // Update email verification status
         if (user.email_verified) {
             emailVerifiedIndicator.innerHTML = '<i class="fas fa-check-circle"></i>';
             emailVerifiedIndicator.className = 'flex-shrink-0 h-5 w-5 text-green-500 mt-0.5';
@@ -598,7 +581,7 @@ $additional_scripts = <<<HTML
             emailVerifiedIndicator.className = 'flex-shrink-0 h-5 w-5 text-red-500 mt-0.5';
         }
         
-        // MFA status
+        // Update MFA status
         if (user.mfa_enabled) {
             mfaEnabledIndicator.innerHTML = '<i class="fas fa-check-circle"></i>';
             mfaEnabledIndicator.className = 'flex-shrink-0 h-5 w-5 text-green-500 mt-0.5';
@@ -615,7 +598,7 @@ $additional_scripts = <<<HTML
             mfaStatusBadge.className = 'bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded flex items-center';
         }
         
-        // Last login
+        // Update last login info
         if (user.last_login) {
             lastLoginText.textContent = `Last login: \${formatDate(user.last_login)}`;
         } else {
@@ -634,75 +617,71 @@ $additional_scripts = <<<HTML
         securityScoreBar.style.width = `\${scorePercentage}%`;
         securityScoreText.textContent = `\${scorePercentage}%`;
         
+        // Update score color and message based on percentage
         if (scorePercentage < 70) {
             securityScoreBar.className = 'bg-yellow-400 h-2.5 rounded-full';
+            securityScoreContainer.className = 'bg-yellow-50 p-4 rounded-md';
             securityScoreMessage.textContent = 'Your account security can be improved. Enable two-factor authentication for better protection.';
         } else if (scorePercentage === 100) {
             securityScoreBar.className = 'bg-green-500 h-2.5 rounded-full';
+            securityScoreContainer.className = 'bg-green-50 p-4 rounded-md';
             securityScoreMessage.textContent = 'Great job! Your account has all recommended security features enabled.';
+        } else {
+            securityScoreBar.className = 'bg-yellow-400 h-2.5 rounded-full';
+            securityScoreContainer.className = 'bg-yellow-50 p-4 rounded-md';
+            securityScoreMessage.textContent = 'Your account security can be improved. Complete all security checklist items for better protection.';
         }
     }
     
-    // Update MFA disabled state
+    // Update UI to show MFA disabled state
     function updateMfaDisabledState() {
         mfaDisabledState.classList.remove('hidden');
         mfaSetupState.classList.add('hidden');
         mfaEnabledState.classList.add('hidden');
     }
     
-    // Update MFA setup state
+    // Update UI to show MFA setup state
     function updateMfaSetupState() {
         mfaDisabledState.classList.add('hidden');
         mfaSetupState.classList.remove('hidden');
         mfaEnabledState.classList.add('hidden');
     }
     
-    // Update MFA enabled state
+    // Update UI to show MFA enabled state
     function updateMfaEnabledState() {
         mfaDisabledState.classList.add('hidden');
         mfaSetupState.classList.add('hidden');
         mfaEnabledState.classList.remove('hidden');
         
-        // In a real app, we would fetch and display backup codes here
-        const backupCodes = [
-            'ABCD-EFGH-IJKL', 'MNOP-QRST-UVWX',
-            'ABCD-EFGH-IJKL', 'MNOP-QRST-UVWX',
-            'ABCD-EFGH-IJKL', 'MNOP-QRST-UVWX',
-            'ABCD-EFGH-IJKL', 'MNOP-QRST-UVWX'
-        ];
-        
-        // Update backup codes
-        const backupCodesContainer = document.getElementById('backupCodesContainer');
-        backupCodesContainer.innerHTML = '';
-        
-        backupCodes.forEach(code => {
-            const codeElement = document.createElement('div');
-            codeElement.className = 'text-mono text-sm bg-white p-2 rounded border border-gray-300';
-            codeElement.textContent = code;
-            backupCodesContainer.appendChild(codeElement);
-        });
+        // Update backup codes display
+        updateBackupCodesDisplay();
     }
     
-    // Set up MFA
+    // Start MFA setup process
     async function setupMfa() {
         try {
             showLoading();
             
-            // In a real app, this would be an API call to generate MFA setup data
-            // For demo purposes, we'll simulate a response
+            // Request MFA setup data from API
+            const response = await apiRequest('/auth/mfa/setup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    method: 'totp' 
+                })
+            });
             
-            // Simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (!response.ok) {
+                throw new Error('Failed to set up MFA');
+            }
             
-            // Simulate MFA setup data
-            mfaData = {
-                qrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=otpauth://totp/KDJ-Lanka:' + userData.email + '?secret=JBSWY3DPEHPK3PXP&issuer=KDJ-Lanka',
-                setupKey: 'JBSWY3DPEHPK3PXP'
-            };
+            mfaData = await response.json();
             
-            // Update UI with setup data
-            document.getElementById('qrCode').innerHTML = `<img src="\${mfaData.qrCode}" alt="QR Code" class="w-48 h-48">`;
-            document.getElementById('setupKey').textContent = mfaData.setupKey;
+            // Update UI with QR code and setup key
+            qrCode.innerHTML = `<img src="\${mfaData.qrcode_url || mfaData.qr_code_url}" alt="QR Code" class="w-48 h-48">`;
+            setupKey.textContent = mfaData.secret || mfaData.setup_key;
             
             // Switch to setup state
             updateMfaSetupState();
@@ -715,26 +694,51 @@ $additional_scripts = <<<HTML
         }
     }
     
-    // Verify MFA setup
-    async function verifyMfa(code) {
+    // Verify MFA setup with verification code
+    async function verifyMfaSetup(code) {
         try {
             showLoading();
             
-            // Simulate API call to verify MFA setup
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // For demo purposes, any 6-digit code is accepted
-            // In a real app, this would validate the code with the backend
-            if (code.length !== 6 || !/^[0-9]+$/.test(code)) {
-                throw new Error('Invalid verification code');
+            // Validate code format
+            if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
+                hideLoading();
+                showToast('Please enter a valid 6-digit verification code.', 'error');
+                return;
             }
             
-            // Update user data
+            // Send verification request to API
+            const response = await apiRequest('/auth/mfa/verify-setup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    code: code,
+                    secret: mfaData.secret || mfaData.setup_key
+                })
+            });
+            
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || 'Failed to verify MFA setup');
+            }
+            
+            // Get response data including backup codes
+            const responseData = await response.json();
+            
+            // Store backup codes if provided
+            if (responseData.backup_codes) {
+                backupCodes = responseData.backup_codes;
+            }
+            
+            // Update user data with MFA enabled
             userData.mfa_enabled = true;
             userData.mfa_methods = ['totp'];
             
-            // Update UI
+            // Update security overview to reflect MFA enabled
             updateSecurityOverview(userData);
+            
+            // Switch to enabled state
             updateMfaEnabledState();
             
             showToast('Two-factor authentication enabled successfully!', 'success');
@@ -742,8 +746,110 @@ $additional_scripts = <<<HTML
             hideLoading();
         } catch (error) {
             hideLoading();
-            console.error('Failed to verify MFA:', error);
+            console.error('Failed to verify MFA setup:', error);
             showToast('Failed to verify code. Please check your authenticator app and try again.', 'error');
+        }
+    }
+    
+    // Load backup codes for an account with MFA already enabled
+    async function loadBackupCodes() {
+        try {
+            // Only try to load backup codes if MFA is enabled
+            if (!userData || !userData.mfa_enabled) return;
+            
+            const response = await apiRequest('/auth/mfa/backup-codes', {
+                method: 'GET'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to load backup codes');
+            }
+            
+            const data = await response.json();
+            
+            if (data.backup_codes && data.backup_codes.length > 0) {
+                backupCodes = data.backup_codes;
+                updateBackupCodesDisplay();
+            }
+        } catch (error) {
+            console.error('Failed to load backup codes:', error);
+            // Non-fatal error, continue with UI updates
+        }
+    }
+    
+    // Update the display of backup codes in the UI
+    function updateBackupCodesDisplay() {
+        if (!backupCodes || backupCodes.length === 0) {
+            // If no backup codes available, show message
+            backupCodesContainer.innerHTML = `
+                <div class="col-span-2 text-center text-sm text-gray-500 p-4">
+                    No backup codes available. Please generate new backup codes.
+                </div>
+                <div class="col-span-2 text-center">
+                    <button id="generateBackupCodesBtn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-kdj-red hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kdj-red">
+                        <i class="fas fa-key mr-2"></i>
+                        Generate Backup Codes
+                    </button>
+                </div>
+            `;
+            
+            // Add event listener to the generate button
+            const generateBtn = document.getElementById('generateBackupCodesBtn');
+            if (generateBtn) {
+                generateBtn.addEventListener('click', generateNewBackupCodes);
+            }
+            
+            return;
+        }
+        
+        // Clear the container
+        backupCodesContainer.innerHTML = '';
+        
+        // Add each backup code to the container
+        backupCodes.forEach(code => {
+            const codeElement = document.createElement('div');
+            codeElement.className = 'text-mono text-sm bg-white p-2 rounded border border-gray-300';
+            codeElement.textContent = formatBackupCode(code);
+            backupCodesContainer.appendChild(codeElement);
+        });
+    }
+    
+    // Format a backup code for display (add dashes for readability)
+    function formatBackupCode(code) {
+        if (code.includes('-')) return code; // Already formatted
+        
+        // Add a dash every 4 characters
+        return code.match(/.{1,4}/g).join('-');
+    }
+    
+    // Generate new backup codes
+    async function generateNewBackupCodes() {
+        try {
+            showLoading();
+            
+            const response = await apiRequest('/auth/mfa/generate-backup-codes', {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to generate new backup codes');
+            }
+            
+            const data = await response.json();
+            
+            if (data.backup_codes) {
+                backupCodes = data.backup_codes;
+                updateBackupCodesDisplay();
+                showToast('New backup codes generated successfully!', 'success');
+            } else {
+                throw new Error('No backup codes returned from server');
+            }
+            
+            hideLoading();
+        } catch (error) {
+            hideLoading();
+            console.error('Failed to generate backup codes:', error);
+            showToast('Failed to generate new backup codes. Please try again.', 'error');
         }
     }
     
@@ -752,21 +858,37 @@ $additional_scripts = <<<HTML
         try {
             showLoading();
             
-            // Simulate API call to disable MFA
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // For demo purposes, any non-empty password is accepted
-            // In a real app, this would validate the password with the backend
+            // Validate input
             if (!password) {
-                throw new Error('Password is required');
+                hideLoading();
+                showToast('Password is required to disable two-factor authentication.', 'error');
+                return;
+            }
+            
+            // Send request to disable MFA
+            const response = await apiRequest('/auth/mfa/disable', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    password: password 
+                })
+            });
+            
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || 'Failed to disable MFA');
             }
             
             // Update user data
             userData.mfa_enabled = false;
             userData.mfa_methods = [];
             
-            // Update UI
+            // Update security overview
             updateSecurityOverview(userData);
+            
+            // Switch to disabled state
             updateMfaDisabledState();
             
             showToast('Two-factor authentication disabled successfully.', 'success');
@@ -779,16 +901,125 @@ $additional_scripts = <<<HTML
         }
     }
     
-    // Load login activity
+    // Handle downloading backup codes
+    function downloadBackupCodes() {
+        if (!backupCodes || backupCodes.length === 0) {
+            showToast('No backup codes available to download.', 'error');
+            return;
+        }
+        
+        // Create text content for download
+        const content = [
+            'KDJ LANKA - TWO-FACTOR AUTHENTICATION BACKUP CODES',
+            '=====================================================',
+            'Keep these backup codes in a safe place. Each code can only be used once.',
+            '',
+            ...backupCodes.map(code => formatBackupCode(code)),
+            '',
+            `Generated on: \${new Date().toLocaleString()}`,
+            'For: ' + (userData.email || 'Your KDJ Lanka Account')
+        ].join('\\n');
+        
+        // Create blob and download link
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'kdj-lanka-backup-codes.txt';
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+        
+        showToast('Backup codes downloaded successfully.', 'success');
+    }
+    
+    // Handle copying backup codes to clipboard
+    function copyBackupCodes() {
+        if (!backupCodes || backupCodes.length === 0) {
+            showToast('No backup codes available to copy.', 'error');
+            return;
+        }
+        
+        // Create formatted text for clipboard
+        const content = backupCodes.map(code => formatBackupCode(code)).join('\\n');
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(content)
+            .then(() => {
+                showToast('Backup codes copied to clipboard.', 'success');
+            })
+            .catch(err => {
+                console.error('Failed to copy backup codes:', err);
+                showToast('Failed to copy backup codes. Please try again.', 'error');
+            });
+    }
+    
+    // Handle printing backup codes
+    function printBackupCodes() {
+        if (!backupCodes || backupCodes.length === 0) {
+            showToast('No backup codes available to print.', 'error');
+            return;
+        }
+        
+        // Create a printable page
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>KDJ Lanka - Backup Codes</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    h1 { font-size: 18px; margin-bottom: 10px; }
+                    .codes { margin: 20px 0; }
+                    .code { 
+                        font-family: monospace; 
+                        font-size: 16px; 
+                        padding: 8px; 
+                        margin: 5px 0; 
+                        border: 1px solid #ccc; 
+                        border-radius: 4px; 
+                        background: #f8f8f8; 
+                    }
+                    .info { font-size: 12px; color: #666; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <h1>KDJ Lanka - Two-Factor Authentication Backup Codes</h1>
+                <p>Keep these backup codes in a safe place. Each code can only be used once.</p>
+                <div class="codes">
+                    \${backupCodes.map(code => `<div class="code">\${formatBackupCode(code)}</div>`).join('')}
+                </div>
+                <div class="info">
+                    <p>Generated on: \${new Date().toLocaleString()}</p>
+                    <p>For: \${userData.email || 'Your KDJ Lanka Account'}</p>
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    }
+    
+    // Load login activity data
     function loadLoginActivity() {
         // In a real app, this would fetch login history from an API
-        // For demo purposes, we'll create some sample data
+        // For demo purposes, we'll create sample data with the actual last login from user data
         
         const loginActivity = [
             {
-                date: new Date(),
+                date: userData && userData.last_login ? new Date(userData.last_login) : new Date(),
                 ip: '103.24.55.162',
-                device: 'Chrome 98 on Windows',
+                device: 'Chrome on Windows',
                 location: 'Colombo, Sri Lanka',
                 status: 'success'
             },
@@ -858,44 +1089,42 @@ $additional_scripts = <<<HTML
         });
     }
     
-    // Set up event listeners
+    // Event listeners
     
-    // Setup MFA button
-    setupMfaBtn.addEventListener('click', () => {
-        setupMfa();
-    });
+    // Setup MFA button click
+    setupMfaBtn.addEventListener('click', setupMfa);
     
-    // Cancel MFA setup button
+    // Cancel MFA setup button click
     cancelMfaSetupBtn.addEventListener('click', () => {
         updateMfaDisabledState();
     });
     
-    // Verify MFA form
+    // Verify MFA form submission
     verifyMfaForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        const code = document.getElementById('verificationCode').value;
-        verifyMfa(code);
+        const code = verificationCode.value.trim();
+        verifyMfaSetup(code);
     });
     
-    // Disable MFA button
+    // Disable MFA button click
     disableMfaBtn.addEventListener('click', () => {
         disableMfaModal.classList.remove('hidden');
         disableMfaPassword.value = '';
     });
     
-    // Cancel disable MFA button
+    // Cancel disable MFA button click
     cancelDisableMfaBtn.addEventListener('click', () => {
         disableMfaModal.classList.add('hidden');
     });
     
-    // Close modal when clicking outside
+    // Close disable MFA modal when clicking outside
     disableMfaModal.addEventListener('click', (event) => {
         if (event.target === disableMfaModal) {
             disableMfaModal.classList.add('hidden');
         }
     });
     
-    // Confirm disable MFA button
+    // Confirm disable MFA button click
     confirmDisableMfaBtn.addEventListener('click', () => {
         const password = disableMfaPassword.value;
         
@@ -908,78 +1137,31 @@ $additional_scripts = <<<HTML
         disableMfa(password);
     });
     
-    // Copy setup key button
+    // Copy setup key button click
     copySetupKeyBtn.addEventListener('click', () => {
-        const setupKey = document.getElementById('setupKey').textContent;
-        navigator.clipboard.writeText(setupKey);
-        showToast('Setup key copied to clipboard', 'success');
+        const setupKeyValue = setupKey.textContent;
+        navigator.clipboard.writeText(setupKeyValue)
+            .then(() => {
+                showToast('Setup key copied to clipboard', 'success');
+            })
+            .catch(err => {
+                console.error('Failed to copy setup key:', err);
+                showToast('Failed to copy setup key. Please try again.', 'error');
+            });
     });
     
-    // Download backup codes button
-    downloadBackupCodesBtn.addEventListener('click', () => {
-        // In a real app, this would generate a text file with the backup codes
-        showToast('Backup codes download started', 'success');
-    });
+    // Download backup codes button click
+    downloadBackupCodesBtn.addEventListener('click', downloadBackupCodes);
     
-    // Copy backup codes button
-    copyBackupCodesBtn.addEventListener('click', () => {
-        // In a real app, this would copy all backup codes to clipboard
-        showToast('Backup codes copied to clipboard', 'success');
-    });
+    // Copy backup codes button click
+    copyBackupCodesBtn.addEventListener('click', copyBackupCodes);
     
-    // Print backup codes button
-    printBackupCodesBtn.addEventListener('click', () => {
-        // In a real app, this would open a print dialog with the backup codes
-        window.print();
-    });
+    // Print backup codes button click
+    printBackupCodesBtn.addEventListener('click', printBackupCodes);
     
-    // Mobile sidebar toggle
-    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
-    const mobileSidebar = document.getElementById('mobileSidebar');
-    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
-    const closeMobileSidebar = document.getElementById('closeMobileSidebar');
-    
-    mobileSidebarToggle.addEventListener('click', function() {
-        mobileSidebar.classList.remove('hidden');
-        setTimeout(() => {
-            mobileSidebarContent.classList.remove('-translate-x-full');
-        }, 10);
-    });
-    
-    function closeSidebar() {
-        mobileSidebarContent.classList.add('-translate-x-full');
-        setTimeout(() => {
-            mobileSidebar.classList.add('hidden');
-        }, 300);
-    }
-    
-    closeMobileSidebar.addEventListener('click', closeSidebar);
-    
-    mobileSidebar.addEventListener('click', function(e) {
-        if (e.target === mobileSidebar) {
-            closeSidebar();
-        }
-    });
-    
-    // Sidebar logout
-    const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
-    const mobileSidebarLogoutBtn = document.getElementById('mobileSidebarLogoutBtn');
-    
-    function handleSidebarLogout() {
-        handleLogout();
-    }
-    
-    if (sidebarLogoutBtn) {
-        sidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
-    }
-    
-    if (mobileSidebarLogoutBtn) {
-        mobileSidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
-    }
-    
-    // Initialize
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
-        setGreeting();
+        // Load user profile and security data
         loadUserProfile();
     });
 </script>

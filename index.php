@@ -1,15 +1,4 @@
 <?php
-// Check if user is already logged in
-$auth_token = isset($_COOKIE['auth_token']) ? $_COOKIE['auth_token'] : '';
-if (empty($auth_token)) {
-    // Check for token in session storage via JavaScript
-    echo "<script>
-        if (sessionStorage.getItem('auth_token')) {
-            window.location.href = 'dashboard.php';
-        }
-    </script>";
-}
-
 // Set page specific variables
 $title = "Login";
 $description = "Sign in to your KDJ Lanka account";
@@ -25,6 +14,7 @@ $additional_head = <<<HTML
         background-image: url('/assets/images/sl-pattern.png');
         background-size: cover;
         background-position: center;
+        min-height: 100vh;
     }
     .login-card {
         backdrop-filter: blur(10px);
@@ -33,8 +23,8 @@ $additional_head = <<<HTML
     /* Custom styles for the login form */
     .form-input:focus {
         outline: none;
-        border-color: #f87171;
-        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+        border-color: #cb2127;
+        box-shadow: 0 0 0 2px rgba(203, 33, 39, 0.2);
     }
     /* Google Sign-In button */
     .google-signin-btn {
@@ -46,14 +36,59 @@ $additional_head = <<<HTML
 </style>
 HTML;
 
+// Check if user is already logged in with JavaScript
+echo "<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if there's a valid auth token
+        const authToken = sessionStorage.getItem('auth_token');
+        
+        if (authToken) {
+            // Verify token by making an API call
+            fetch('{$apiBaseUrl}/users/me', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer \${authToken}`
+                },
+                credentials: 'include'
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('Invalid token');
+            })
+            .then(userData => {
+                // Check if there's a specific redirect URL in sessionStorage
+                const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                
+                if (redirectAfterLogin) {
+                    // User is logged in, redirect to the saved URL
+                    sessionStorage.removeItem('redirectAfterLogin');
+                    window.location.href = redirectAfterLogin;
+                } else {
+                    // No saved redirect, go to dashboard
+                    window.location.href = 'dashboard.php';
+                }
+            })
+            .catch(error => {
+                console.error('Auth check error:', error);
+                // Clear invalid token
+                sessionStorage.removeItem('auth_token');
+                sessionStorage.removeItem('token_expiry');
+            });
+        }
+    });
+</script>";
+
 // Include header
 include 'header.php';
 ?>
 
-<div class="auth-container flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+<div class="auth-container flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="login-card max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-lg">
         <div class="text-center">
-            <img src="assets/img/kdjcolorlogo.png" class="mx-auto w-40">
+            <img src="assets/img/kdjcolorlogo.png" alt="KDJ Lanka Logo" class="mx-auto w-40">
             <h2 class="mt-6 text-3xl font-extrabold text-kdj-dark">
                 ගිණුමට පිවිසෙන්න
             </h2>
@@ -85,7 +120,7 @@ include 'header.php';
                     </div>
                     <input type="password" id="password" name="password" required
                         class="form-input flex-grow block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 pr-10 focus:border-kdj-red focus:ring-kdj-red sm:text-sm"> 
-                    <span class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-gray-700 hover:text-gray-900" id="togglePassword">
+                    <span class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-gray-700 hover:text-gray-900 password-toggle">
                         <i class="fas fa-eye text-sm"></i>
                     </span>
                 </div>
@@ -133,7 +168,7 @@ include 'header.php';
 </div>
 
 <?php
-// Page specific scripts - adding the API base URL as a JavaScript variable at the beginning
+// Page specific scripts
 $additional_scripts = <<<HTML
 <script>
     // Configuration
@@ -147,10 +182,10 @@ $additional_scripts = <<<HTML
     const rememberMeInput = document.getElementById('remember_me');
     const messageArea = document.getElementById('messageArea');
     const submitButton = document.getElementById('submitButton');
-    const togglePassword = document.getElementById('togglePassword');
     const buttonText = document.getElementById('buttonText');
     const emailErrorEl = document.getElementById('emailError');
     const passwordErrorEl = document.getElementById('passwordError');
+    const googleSignInButton = document.getElementById('googleSignInButton');
     
     // Check if there's a redirect URL in the query parameters
     function checkForRedirectInURL() {
@@ -166,10 +201,46 @@ $additional_scripts = <<<HTML
     // Run it when page loads
     checkForRedirectInURL();
     
-    // Google Sign-In Button DOM Element
-    const googleSignInButton = document.getElementById('googleSignInButton');
+    // Check referrer for internal services
+    function checkReferrer() {
+        const referrer = document.referrer;
+        
+        if (referrer && (
+            referrer.includes('events.kdj.lk') || 
+            referrer.includes('singlish.kdj.lk')
+        )) {
+            // If referred from one of our other sites, store it for redirect after login
+            sessionStorage.setItem('redirectAfterLogin', referrer);
+        }
+    }
+    
+    // Check for FirebaseAuth redirect results
+    function checkRedirectResult() {
+        if (sessionStorage.getItem('auth_redirect_attempt')) {
+            // Clear the flag
+            sessionStorage.removeItem('auth_redirect_attempt');
+            
+            // Show loading while we check the result
+            showLoading();
+            
+            firebaseAuth.getRedirectResult()
+                .then(async (result) => {
+                    hideLoading();
+                    if (result.user) {
+                        // Get the Firebase ID token
+                        const idToken = await result.user.getIdToken(true);
+                        handleGoogleLoginWithToken(idToken);
+                    }
+                })
+                .catch((error) => {
+                    hideLoading();
+                    console.error("Redirect result error:", error);
+                    showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+                });
+        }
+    }
 
-    // Google Sign-In Function
+    // Google Sign-In Handler
     async function signInWithGoogle() {
         if (!firebaseAuth) {
             showMessage('Google පිවිසුම ක්‍රියාත්මක කිරීමට නොහැක. Firebase සූදානම් නැත.', 'error');
@@ -190,9 +261,7 @@ $additional_scripts = <<<HTML
             
             // Set custom parameters for the Google provider
             provider.setCustomParameters({
-                // Forces account selection even when one account is available
                 prompt: 'select_account',
-                // Specify Firebase project domain for better security
                 auth_domain: 'kdj-lanka.firebaseapp.com'
             });
 
@@ -205,29 +274,7 @@ $additional_scripts = <<<HTML
             if (user) {
                 // Get the Firebase ID token
                 const idToken = await user.getIdToken(true);
-                
-                // Send this idToken to your backend
-                const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ id_token: idToken }),
-                    credentials: 'include'
-                });
-
-                const backendData = await backendResponse.json();
-
-                if (backendResponse.ok) {
-                    // Handle login success like regular login
-                    handleLoginSuccess(backendData, true);
-                } else {
-                    handleApiError(backendData, backendResponse.status);
-                    googleSignInButton.disabled = false;
-                    googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
-                    hideLoading();
-                }
+                handleGoogleLoginWithToken(idToken);
             } else {
                 showMessage('Google සමඟින් පිවිසීමට නොහැකි විය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
                 googleSignInButton.disabled = false;
@@ -269,6 +316,39 @@ $additional_scripts = <<<HTML
         }
     }
     
+    // Send the Google ID token to backend
+    async function handleGoogleLoginWithToken(idToken) {
+        try {
+            const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ id_token: idToken }),
+                credentials: 'include'
+            });
+
+            const backendData = await backendResponse.json();
+
+            if (backendResponse.ok) {
+                // Handle login success like regular login
+                handleLoginSuccess(backendData, true);
+            } else {
+                handleApiError(backendData, backendResponse.status);
+                googleSignInButton.disabled = false;
+                googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+                hideLoading();
+            }
+        } catch (error) {
+            console.error("Backend Google login error:", error);
+            showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
+            googleSignInButton.disabled = false;
+            googleSignInButton.querySelector('span').textContent = 'Google සමඟින් පිවිසෙන්න';
+            hideLoading();
+        }
+    }
+    
     // Fallback method using redirect instead of popup
     function tryRedirectAuth() {
         try {
@@ -285,67 +365,7 @@ $additional_scripts = <<<HTML
             console.error("Redirect auth fallback error:", error);
         }
     }
-    
-    // Check for redirect result on page load
-    function checkRedirectResult() {
-        if (sessionStorage.getItem('auth_redirect_attempt')) {
-            // Clear the flag
-            sessionStorage.removeItem('auth_redirect_attempt');
-            
-            // Show loading while we check the result
-            showLoading();
-            
-            firebaseAuth.getRedirectResult()
-                .then(async (result) => {
-                    if (result.user) {
-                        // Get the Firebase ID token
-                        const idToken = await result.user.getIdToken(true);
-                        
-                        // Send to backend
-                        const backendResponse = await fetch(`\${apiBaseUrl}/auth/google-login`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                            },
-                            body: JSON.stringify({ id_token: idToken }),
-                            credentials: 'include'
-                        });
 
-                        const backendData = await backendResponse.json();
-
-                        if (backendResponse.ok) {
-                            handleLoginSuccess(backendData, true);
-                        } else {
-                            handleApiError(backendData, backendResponse.status);
-                            hideLoading();
-                        }
-                    } else {
-                        hideLoading();
-                    }
-                })
-                .catch((error) => {
-                    console.error("Redirect result error:", error);
-                    hideLoading();
-                    showMessage('Google සමඟින් පිවිසීමේදී දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සහ කරන්න.', 'error');
-                });
-        }
-    }
-
-    // Add Event Listener to Google Sign-In Button
-    if (googleSignInButton) {
-        googleSignInButton.addEventListener('click', signInWithGoogle);
-    }
-
-    // Toggle password visibility
-    togglePassword.addEventListener('click', () => {
-        const type = passwordInput.type === 'password' ? 'text' : 'password';
-        passwordInput.type = type;
-        const icon = togglePassword.querySelector('i');
-        icon.classList.toggle('fa-eye');
-        icon.classList.toggle('fa-eye-slash');
-    });
-    
     // Form submission
     loginForm.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -411,7 +431,7 @@ $additional_scripts = <<<HTML
     
     function handleLoginSuccess(data, rememberMe) {
         showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
-        handleTokenStorage(data, rememberMe);
+        storeAuthData(data, rememberMe);
         
         // Check if MFA is required
         if (data.mfa_required && data.mfa_methods?.length > 0) {
@@ -432,37 +452,6 @@ $additional_scripts = <<<HTML
         } else {
             // Default to dashboard
             setTimeout(() => { window.location.href = REDIRECT_URL; }, 1000);
-        }
-    }
-    
-    function handleTokenStorage(data, rememberMe) {
-        const storage = rememberMe ? localStorage : sessionStorage;
-        const otherStorage = rememberMe ? sessionStorage : localStorage; // For clearing opposite storage
-        
-        if (data.access_token) {
-            sessionStorage.setItem('auth_token', data.access_token); // Access token always in session storage
-            if (data.expires_in) {
-                const expiryTime = Date.now() + (data.expires_in * 1000);
-                sessionStorage.setItem('token_expiry', expiryTime.toString());
-            }
-        }
-        
-        if (data.refresh_token) {
-            storage.setItem('refresh_token', data.refresh_token); // Store refresh token based on rememberMe
-            otherStorage.removeItem('refresh_token'); // Clear from the other storage
-        } else {
-            // Ensure refresh token is cleared if not provided
-            localStorage.removeItem('refresh_token');
-            sessionStorage.removeItem('refresh_token');
-        }
-        
-        if (data.user_id) {
-            storage.setItem('user_id', data.user_id);
-            otherStorage.removeItem('user_id');
-        } else {
-            // Ensure user ID is cleared if not provided
-            localStorage.removeItem('user_id');
-            sessionStorage.removeItem('user_id');
         }
     }
     
@@ -537,7 +526,6 @@ $additional_scripts = <<<HTML
     
     function disableSubmitButton(text) {
         submitButton.disabled = true;
-        buttonText.textContent = text;
         // Add spinner using font awesome
         submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i><span>\${text}</span>`;
     }
@@ -548,69 +536,19 @@ $additional_scripts = <<<HTML
         submitButton.innerHTML = `<span id="buttonText">ඇතුල් වන්න</span>`;
     }
     
-    function isValidEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(String(email).toLowerCase());
+    // Add event listener to Google Sign-In Button
+    if (googleSignInButton) {
+        googleSignInButton.addEventListener('click', signInWithGoogle);
     }
     
-    // Save referrer information for redirecting back after login
+    // Initialize when the page loads
     document.addEventListener('DOMContentLoaded', function() {
-        // Check referrer to see if it's from an internal site we should redirect back to
-        const referrer = document.referrer;
-        
-        if (referrer && (
-            referrer.includes('events.kdj.lk') || 
-            referrer.includes('singlish.kdj.lk')
-        )) {
-            // If referred from one of our other sites, store it for redirect after login
-            sessionStorage.setItem('redirectAfterLogin', referrer);
-        }
-        
         // Check for any Firebase auth redirect results
         checkRedirectResult();
         
-        // First check if user is already logged in, redirect to dashboard
-        const authToken = sessionStorage.getItem('auth_token');
-        if (authToken) {
-            // Verify token is valid
-            fetch(`\${apiBaseUrl}/users/me`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer \${authToken}`
-                },
-                credentials: 'include'
-            })
-            .then(response => {
-                if (response.ok) {
-                    // Check if there's a specific redirect URL in sessionStorage
-                    const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-                    
-                    if (redirectAfterLogin) {
-                        // User is logged in, redirect to the saved URL
-                        sessionStorage.removeItem('redirectAfterLogin');
-                        window.location.href = redirectAfterLogin;
-                    } else {
-                        // No saved redirect, go to dashboard
-                        window.location.href = REDIRECT_URL;
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Auth check error:', error);
-                // Token may be invalid, let user login again
-            });
-        }
+        // Check referrer for redirect after login
+        checkReferrer();
     });
-    
-    // Show or hide loading indicator
-    function showLoading() {
-        document.getElementById('loadingIndicator').style.display = 'flex';
-    }
-    
-    function hideLoading() {
-        document.getElementById('loadingIndicator').style.display = 'none';
-    }
 </script>
 HTML;
 

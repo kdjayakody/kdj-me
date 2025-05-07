@@ -11,6 +11,7 @@ $additional_head = <<<HTML
         background-image: url('/assets/images/sl-pattern.png');
         background-size: cover;
         background-position: center;
+        min-height: 100vh;
     }
     .mfa-card {
         backdrop-filter: blur(10px);
@@ -23,6 +24,11 @@ $additional_head = <<<HTML
         text-align: center;
         border-radius: 0.375rem;
     }
+    .otp-input:focus {
+        outline: none;
+        border-color: #cb2127;
+        box-shadow: 0 0 0 2px rgba(203, 33, 39, 0.2);
+    }
 </style>
 HTML;
 
@@ -30,7 +36,7 @@ HTML;
 include 'header.php';
 ?>
 
-<div class="auth-container flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+<div class="auth-container flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="mfa-card max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-lg">
         <div class="text-center">
             <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-kdj-red bg-opacity-10 mb-4">
@@ -42,6 +48,20 @@ include 'header.php';
             <p class="mt-2 text-sm text-gray-600">
                 Please enter the verification code from your authenticator app
             </p>
+        </div>
+        
+        <div id="errorMessage" class="bg-red-50 p-4 rounded-md border border-red-200 hidden">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-circle text-red-400 text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800" id="errorTitle">Authentication failed</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <p id="errorDetail">Invalid verification code. Please try again.</p>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <form id="mfaForm" class="mt-8 space-y-6">
@@ -90,7 +110,7 @@ include 'header.php';
             </div>
             
             <div class="text-center">
-                <p class="text-xs text-gray-600">
+                <p class="text-xs text-gray-600" id="backupText">
                     Lost access to your authenticator app? <a href="#" id="showBackupLink" class="font-medium text-kdj-red hover:text-red-800">Use backup code</a>.
                 </p>
                 <p class="text-xs text-gray-600 mt-2">
@@ -111,29 +131,21 @@ $additional_scripts = <<<HTML
     const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
     const redirectUrlAfterLogin = 'dashboard.php';
     
-    // Parse available methods from URL query parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const methodsParam = urlParams.get('methods');
-    let availableMethods = ['totp'];
+    // DOM elements
+    const mfaForm = document.getElementById('mfaForm');
+    const methodsInput = document.getElementById('methodsInput');
+    const authMethodSelect = document.getElementById('authMethod');
+    const methodSelectorContainer = document.getElementById('methodSelectorContainer');
+    const totpContainer = document.getElementById('totpContainer');
+    const backupContainer = document.getElementById('backupContainer');
+    const verifyButton = document.getElementById('verifyButton');
+    const showBackupLink = document.getElementById('showBackupLink');
+    const backupText = document.getElementById('backupText');
+    const errorMessage = document.getElementById('errorMessage');
+    const errorTitle = document.getElementById('errorTitle');
+    const errorDetail = document.getElementById('errorDetail');
     
-    if (methodsParam) {
-        availableMethods = methodsParam.split(',');
-        document.getElementById('methodsInput').value = methodsParam;
-    }
-    
-    // Show method selector if multiple methods are available
-    if (availableMethods.length > 1) {
-        document.getElementById('methodSelectorContainer').classList.remove('hidden');
-    }
-    
-    // Check if there's a token in session storage (from login)
-    const authToken = sessionStorage.getItem('auth_token');
-    if (!authToken) {
-        // Redirect to login if no token
-        window.location.href = 'index.php';
-    }
-    
-    // OTP input handling
+    // OTP input elements
     const otpInputs = [
         document.getElementById('otp1'),
         document.getElementById('otp2'),
@@ -143,117 +155,184 @@ $additional_scripts = <<<HTML
         document.getElementById('otp6')
     ];
     
-    // Focus on the first input when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        otpInputs[0].focus();
-    });
+    // Verify auth token and redirect if not present
+    function checkAuthToken() {
+        const authToken = sessionStorage.getItem('auth_token');
+        if (!authToken) {
+            // If no token found, redirect to login
+            window.location.href = 'index.php';
+            return false;
+        }
+        return true;
+    }
     
-    // Handle OTP input behavior
-    otpInputs.forEach((input, index) => {
-        // Move to next input when a digit is entered
-        input.addEventListener('input', function() {
-            // Update the value to ensure it's only a digit
-            const sanitizedValue = this.value.replace(/[^0-9]/g, '');
-            this.value = sanitizedValue;
-            
-            if (sanitizedValue && index < otpInputs.length - 1) {
-                otpInputs[index + 1].focus();
-            }
-            
-            // Combine all values into the hidden input
-            const combinedCode = otpInputs.map(input => input.value).join('');
-            document.getElementById('totpCode').value = combinedCode;
-            
-            // Submit the form if all 6 digits are entered
-            if (combinedCode.length === 6 && /^[0-9]{6}$/.test(combinedCode)) {
-                setTimeout(() => {
-                    document.getElementById('mfaForm').dispatchEvent(new Event('submit'));
-                }, 250);
-            }
-        });
+    // Parse available methods from URL query parameter
+    function parseAvailableMethods() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const methodsParam = urlParams.get('methods');
+        let availableMethods = ['totp']; // Default to TOTP if not specified
         
-        // Handle backspace key
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Backspace' && !this.value && index > 0) {
-                otpInputs[index - 1].focus();
-            }
-        });
+        if (methodsParam) {
+            availableMethods = methodsParam.split(',');
+            methodsInput.value = methodsParam;
+            
+            // Update UI based on available methods
+            updateMethodsUI(availableMethods);
+        }
         
-        // Allow pasting the entire OTP
-        input.addEventListener('paste', function(e) {
-            e.preventDefault();
-            const pasteData = e.clipboardData.getData('text');
-            if (/^[0-9]{6}$/.test(pasteData)) {
-                // Distribute the 6 digits among the inputs
-                for (let i = 0; i < otpInputs.length; i++) {
-                    otpInputs[i].value = pasteData.charAt(i);
-                }
-                document.getElementById('totpCode').value = pasteData;
-                
-                // Submit the form
-                setTimeout(() => {
-                    document.getElementById('mfaForm').dispatchEvent(new Event('submit'));
-                }, 250);
-            }
-        });
-    });
+        return availableMethods;
+    }
     
-    // Handle method selection
-    const authMethodSelect = document.getElementById('authMethod');
-    const totpContainer = document.getElementById('totpContainer');
-    const backupContainer = document.getElementById('backupContainer');
+    // Update UI based on available authentication methods
+    function updateMethodsUI(methods) {
+        // Show method selector if multiple methods are available
+        methodSelectorContainer.classList.toggle('hidden', methods.length <= 1);
+        
+        // Check if backup code is available
+        if (!methods.includes('backup')) {
+            // Hide backup option if not available
+            const backupOption = Array.from(authMethodSelect.options).find(option => option.value === 'backup');
+            if (backupOption) backupOption.remove();
+            
+            // Hide the backup link
+            backupText.classList.add('hidden');
+        }
+        
+        // Update dropdown options
+        while (authMethodSelect.options.length > 0) {
+            authMethodSelect.options.remove(0);
+        }
+        
+        if (methods.includes('totp')) {
+            const option = document.createElement('option');
+            option.value = 'totp';
+            option.text = 'Authenticator App';
+            authMethodSelect.add(option);
+        }
+        
+        if (methods.includes('backup')) {
+            const option = document.createElement('option');
+            option.value = 'backup';
+            option.text = 'Backup Code';
+            authMethodSelect.add(option);
+        }
+        
+        // Default to the first available method
+        if (methods.length > 0) {
+            authMethodSelect.value = methods[0];
+            updateMethodDisplay(methods[0]);
+        }
+    }
     
-    authMethodSelect.addEventListener('change', function() {
-        if (this.value === 'totp') {
+    // Update method display based on selected method
+    function updateMethodDisplay(method) {
+        if (method === 'totp') {
             totpContainer.classList.remove('hidden');
             backupContainer.classList.add('hidden');
             otpInputs[0].focus();
-        } else if (this.value === 'backup') {
+        } else if (method === 'backup') {
             totpContainer.classList.add('hidden');
             backupContainer.classList.remove('hidden');
             document.getElementById('backupCode').focus();
         }
-    });
+    }
     
-    // Handle "Use backup code" link
-    document.getElementById('showBackupLink').addEventListener('click', function(e) {
-        e.preventDefault();
+    // Initialize OTP inputs
+    function initOTPInputs() {
+        // Focus on the first input
+        otpInputs[0].focus();
+        
+        otpInputs.forEach((input, index) => {
+            // Move to next input when a digit is entered
+            input.addEventListener('input', function() {
+                // Update the value to ensure it's only a digit
+                const sanitizedValue = this.value.replace(/[^0-9]/g, '');
+                this.value = sanitizedValue;
+                
+                if (sanitizedValue && index < otpInputs.length - 1) {
+                    otpInputs[index + 1].focus();
+                }
+                
+                // Combine all values into the hidden input
+                const combinedCode = otpInputs.map(input => input.value).join('');
+                document.getElementById('totpCode').value = combinedCode;
+                
+                // Submit the form if all 6 digits are entered
+                if (combinedCode.length === 6 && /^[0-9]{6}$/.test(combinedCode)) {
+                    setTimeout(() => {
+                        mfaForm.dispatchEvent(new Event('submit'));
+                    }, 250);
+                }
+            });
+            
+            // Handle backspace key
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && !this.value && index > 0) {
+                    otpInputs[index - 1].focus();
+                }
+            });
+            
+            // Allow pasting the entire OTP
+            input.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const pasteData = e.clipboardData.getData('text');
+                if (/^[0-9]{6}$/.test(pasteData)) {
+                    // Distribute the 6 digits among the inputs
+                    for (let i = 0; i < otpInputs.length; i++) {
+                        otpInputs[i].value = pasteData.charAt(i);
+                    }
+                    document.getElementById('totpCode').value = pasteData;
+                    
+                    // Submit the form
+                    setTimeout(() => {
+                        mfaForm.dispatchEvent(new Event('submit'));
+                    }, 250);
+                }
+            });
+        });
+    }
+    
+    // Show the backup code input
+    function showBackupCodeInput() {
+        const availableMethods = parseAvailableMethods();
         
         if (availableMethods.includes('backup')) {
             authMethodSelect.value = 'backup';
-            totpContainer.classList.add('hidden');
-            backupContainer.classList.remove('hidden');
-            document.getElementById('backupCode').focus();
+            updateMethodDisplay('backup');
             
             // Show method selector if it was hidden
-            document.getElementById('methodSelectorContainer').classList.remove('hidden');
+            methodSelectorContainer.classList.remove('hidden');
         } else {
-            showToast('Backup codes are not enabled for your account.', 'error');
+            showError('Backup codes are not enabled for your account.');
         }
-    });
+    }
     
-    // Handle form submission
-    const mfaForm = document.getElementById('mfaForm');
-    const verifyButton = document.getElementById('verifyButton');
+    // Show error message
+    function showError(message, title = 'Verification Failed') {
+        errorTitle.textContent = title;
+        errorDetail.textContent = message;
+        errorMessage.classList.remove('hidden');
+        
+        // Scroll to error message
+        errorMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
     
-    mfaForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
+    // Hide error message
+    function hideError() {
+        errorMessage.classList.add('hidden');
+    }
+    
+    // Verify MFA code
+    async function verifyMFACode(code, method) {
+        if (!checkAuthToken()) return;
         
-        const method = authMethodSelect.value;
-        let code = '';
-        
-        if (method === 'totp') {
-            code = document.getElementById('totpCode').value;
-            if (code.length !== 6 || !/^[0-9]{6}$/.test(code)) {
-                showToast('Please enter a valid 6-digit verification code.', 'error');
-                return;
-            }
-        } else if (method === 'backup') {
-            code = document.getElementById('backupCode').value.replace(/[^A-Za-z0-9]/g, '');
-            if (code.length < 10) {
-                showToast('Please enter a valid backup code.', 'error');
-                return;
-            }
+        // Validate input
+        if (method === 'totp' && (code.length !== 6 || !/^[0-9]{6}$/.test(code))) {
+            showError('Please enter a valid 6-digit verification code.');
+            return;
+        } else if (method === 'backup' && code.trim().length < 10) {
+            showError('Please enter a valid backup code.');
+            return;
         }
         
         // Disable button and show loading
@@ -261,6 +340,10 @@ $additional_scripts = <<<HTML
         const originalButtonText = verifyButton.innerHTML;
         verifyButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Verifying...';
         showLoading();
+        hideError();
+        
+        // Get auth token from session storage
+        const authToken = sessionStorage.getItem('auth_token');
         
         try {
             const response = await fetch(`\${apiBaseUrl}/auth/mfa/verify`, {
@@ -285,11 +368,26 @@ $additional_scripts = <<<HTML
                 // Update token if provided
                 if (responseData.access_token) {
                     sessionStorage.setItem('auth_token', responseData.access_token);
+                    
+                    // Update expiry time if provided
+                    if (responseData.expires_in) {
+                        const expiryTime = Date.now() + (responseData.expires_in * 1000);
+                        sessionStorage.setItem('token_expiry', expiryTime.toString());
+                    }
                 }
                 
-                // Redirect to dashboard
+                // Get the redirect URL if available, otherwise use default
+                const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                
+                // Redirect to destination page
                 setTimeout(() => {
-                    window.location.href = redirectUrlAfterLogin;
+                    if (redirectAfterLogin) {
+                        // Clear the redirect URL before navigating
+                        sessionStorage.removeItem('redirectAfterLogin');
+                        window.location.href = redirectAfterLogin;
+                    } else {
+                        window.location.href = redirectUrlAfterLogin;
+                    }
                 }, 1000);
             } else {
                 let errorMessage = 'Verification failed. ';
@@ -310,7 +408,7 @@ $additional_scripts = <<<HTML
                     errorMessage += `Error code: \${response.status}`;
                 }
                 
-                showToast(errorMessage, 'error');
+                showError(errorMessage);
                 
                 // Clear OTP inputs
                 if (method === 'totp') {
@@ -321,13 +419,54 @@ $additional_scripts = <<<HTML
             }
         } catch (error) {
             console.error('MFA verification error:', error);
-            showToast('Failed to verify code. Please try again.', 'error');
+            showError('Failed to verify code. Please check your connection and try again.');
         } finally {
             // Re-enable button and hide loading
             verifyButton.disabled = false;
             verifyButton.innerHTML = originalButtonText;
             hideLoading();
         }
+    }
+    
+    // Event Listeners
+    
+    // Method selection change
+    authMethodSelect.addEventListener('change', function() {
+        updateMethodDisplay(this.value);
+    });
+    
+    // Show backup code link
+    showBackupLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        showBackupCodeInput();
+    });
+    
+    // Form submission
+    mfaForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const method = authMethodSelect.value;
+        let code = '';
+        
+        if (method === 'totp') {
+            code = document.getElementById('totpCode').value;
+        } else if (method === 'backup') {
+            code = document.getElementById('backupCode').value.replace(/[^A-Za-z0-9]/g, '');
+        }
+        
+        verifyMFACode(code, method);
+    });
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if user has a valid auth token
+        if (!checkAuthToken()) return;
+        
+        // Parse available methods from URL
+        parseAvailableMethods();
+        
+        // Initialize OTP inputs
+        initOTPInputs();
     });
 </script>
 HTML;

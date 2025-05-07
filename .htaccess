@@ -16,11 +16,11 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     # Prevent clickjacking
     Header set X-Frame-Options "SAMEORIGIN"
     
-    # Content Security Policy
-    Header set Content-Security-Policy "default-src 'self' *.kdj.lk; script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net cdnjs.cloudflare.com unpkg.com; style-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: *.kdj.lk; connect-src 'self' *.kdj.lk;"
+    # Content Security Policy - Updated to be more secure
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net cdnjs.cloudflare.com unpkg.com www.gstatic.com; style-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: *.kdj.lk; connect-src 'self' *.kdj.lk auth.kdj.lk; frame-src 'self' accounts.google.com;"
     
     # HTTP Strict Transport Security (HSTS)
-    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     
     # Referrer Policy
     Header set Referrer-Policy "strict-origin-when-cross-origin"
@@ -30,6 +30,14 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     
     # Remove PHP version from response headers
     Header unset X-Powered-By
+    
+    # Add Feature-Policy header
+    Header set Feature-Policy "microphone 'none'; camera 'none'; geolocation 'none'; payment 'none'"
+    
+    # Set proper CORS headers for specified domains
+    <FilesMatch "\.(ttf|ttc|otf|eot|woff|woff2|font\.css)$">
+        Header set Access-Control-Allow-Origin "https://kdj.lk https://singlish.kdj.lk https://events.kdj.lk"
+    </FilesMatch>
 </IfModule>
 
 # Custom error pages
@@ -47,7 +55,7 @@ ErrorDocument 500 /500.php
 Options -Indexes
 
 # Protect sensitive files
-<FilesMatch "(^\.htaccess|\.env|\.git|\.htpasswd)">
+<FilesMatch "(^\.htaccess|\.env|\.git|\.htpasswd|config\.php)">
     Order allow,deny
     Deny from all
 </FilesMatch>
@@ -57,7 +65,7 @@ Options -Indexes
     # Disable register globals
     php_flag register_globals off
     
-    # Magic quotes
+    # Magic quotes (deprecated in PHP 7, but kept for backward compatibility)
     php_flag magic_quotes_gpc off
     
     # Secure PHP configuration
@@ -73,6 +81,12 @@ Options -Indexes
     php_value session.cookie_secure 1
     php_value session.use_strict_mode 1
     php_value session.cookie_samesite "Lax"
+    
+    # Set session lifetime
+    php_value session.gc_maxlifetime 3600
+    
+    # Disable file uploads to these directories
+    php_admin_value open_basedir "/var/www/html:/tmp"
 </IfModule>
 
 # Cache control for static files
@@ -106,11 +120,24 @@ Options -Indexes
     AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json application/xml
 </IfModule>
 
-# Cross-domain access for fonts
-<IfModule mod_headers.c>
-    <FilesMatch "\.(ttf|ttc|otf|eot|woff|woff2|font.css)$">
-        Header set Access-Control-Allow-Origin "*.kdj.lk"
-    </FilesMatch>
+# Block access to PHP files in the uploads directory
+<FilesMatch "^[^.]+\.php$">
+    <IfModule mod_rewrite.c>
+        RewriteCond %{REQUEST_URI} /uploads/
+        RewriteRule .* - [F,L]
+    </IfModule>
+</FilesMatch>
+
+# Prevent image hotlinking
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTP_REFERER} !^$
+    RewriteCond %{HTTP_REFERER} !^https?://(www\.)?kdj\.lk [NC]
+    RewriteCond %{HTTP_REFERER} !^https?://(www\.)?singlish\.kdj\.lk [NC]
+    RewriteCond %{HTTP_REFERER} !^https?://(www\.)?events\.kdj\.lk [NC]
+    RewriteCond %{HTTP_REFERER} !^https?://(www\.)?google\. [NC]
+    RewriteCond %{HTTP_REFERER} !^https?://(www\.)?bing\. [NC]
+    RewriteCond %{REQUEST_URI} \.(jpg|jpeg|png|gif|svg)$ [NC]
+    RewriteRule .* - [F,L]
 </IfModule>
 
 # Pretty URLs (remove .php extension)
@@ -118,29 +145,20 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f
 RewriteRule ^(.*)$ $1.php [L]
 
-# Redirect /login to index.php
+# Redirect routes for improved SEO and user experience
 RewriteRule ^login$ index.php [L]
-
-# Redirect /register to register.php
 RewriteRule ^register$ register.php [L]
-
-# Redirect /forgot-password to forgot_password.php
 RewriteRule ^forgot-password$ forgot_password.php [L]
-
-# Redirect /reset-password to reset_password.php
 RewriteRule ^reset-password$ reset_password.php [L]
-
-# Redirect /verify-email to verify_email.php
 RewriteRule ^verify-email$ verify-email.php [L]
-
-# Redirect /dashboard to dashboard.php
 RewriteRule ^dashboard$ dashboard.php [L]
-
-# Redirect /profile to profile.php
 RewriteRule ^profile$ profile.php [L]
-
-# Redirect /settings to settings.php
 RewriteRule ^settings$ settings.php [L]
-
-# Redirect /security to security.php
 RewriteRule ^security$ security.php [L]
+
+# Prevent access to backup, source, and configuration files
+<FilesMatch "\.(bak|config|sql|fla|ini|log|sh|inc|swp|dist|orig|old|save|back|bck|backup)$">
+    Order allow,deny
+    Deny from all
+    Satisfy All
+</FilesMatch>
