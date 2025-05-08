@@ -16,8 +16,8 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     # Prevent clickjacking
     Header set X-Frame-Options "SAMEORIGIN"
     
-    # Content Security Policy - Updated to be more secure
-    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net cdnjs.cloudflare.com unpkg.com www.gstatic.com; style-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: *.kdj.lk; connect-src 'self' *.kdj.lk auth.kdj.lk; frame-src 'self' accounts.google.com;"
+    # Content Security Policy - Updated to be more secure and fix auth issues
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net cdnjs.cloudflare.com unpkg.com www.gstatic.com; style-src 'self' 'unsafe-inline' cdn.tailwindcss.com cdn.jsdelivr.net fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: *.kdj.lk; connect-src 'self' *.kdj.lk https://auth.kdj.lk; frame-src 'self' accounts.google.com;"
     
     # HTTP Strict Transport Security (HSTS)
     Header set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -75,11 +75,13 @@ Options -Indexes
     php_value post_max_size 32M
     php_value upload_max_filesize 32M
     
-    # Session and cookie settings
+    # Session and cookie settings - MODIFIED FOR COMPATIBILITY
     php_value session.use_only_cookies 1
     php_value session.cookie_httponly 1
-    php_value session.cookie_secure 1
+    # Only enable cookie_secure if your site is fully HTTPS
+    # php_value session.cookie_secure 1
     php_value session.use_strict_mode 1
+    # Using Lax instead of Strict for better compatibility
     php_value session.cookie_samesite "Lax"
     
     # Set session lifetime

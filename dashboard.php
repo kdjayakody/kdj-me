@@ -333,6 +333,79 @@ include 'header.php';
 // Page specific scripts
 $additional_scripts = <<<HTML
 <script>
+    // Authentication check script for protected pages
+    // Immediately run auth check when script loads
+    (function checkAuth() {
+        console.log('Protected page: Running immediate auth check');
+        
+        // Debug auth information
+        debugAuth();
+        
+        const authToken = sessionStorage.getItem('auth_token');
+        if (!authToken) {
+            console.error('No auth token found, redirecting to login');
+            // Save current URL to redirect back after login
+            sessionStorage.setItem('redirectAfterLogin', window.location.href);
+            window.location.href = 'index.php';
+            return;
+        }
+        
+        // Verify token is valid by fetching user profile
+        console.log('Verifying token validity...');
+        fetch(`\${apiBaseUrl}/users/me`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer \${authToken}`
+            },
+            credentials: 'include'
+        })
+        .then(response => {
+            if (!response.ok) {
+                console.error('Auth token validation failed:', response.status);
+                throw new Error('Invalid auth token');
+            }
+            return response.json();
+        })
+        .then(userData => {
+            console.log('Auth check successful, user is authenticated');
+            // Update any user-specific UI elements with the user data
+            if (userData.display_name) {
+                const userDisplayName = document.getElementById('userDisplayName');
+                if (userDisplayName) userDisplayName.textContent = userData.display_name;
+                
+                const sidebarUserName = document.getElementById('sidebarUserName');
+                if (sidebarUserName) sidebarUserName.textContent = userData.display_name;
+                
+                const mobileSidebarUserName = document.getElementById('mobileSidebarUserName');
+                if (mobileSidebarUserName) mobileSidebarUserName.textContent = userData.display_name;
+            }
+        })
+        .catch(error => {
+            console.error('Auth validation error:', error);
+            // Clear invalid tokens
+            sessionStorage.removeItem('auth_token');
+            sessionStorage.removeItem('token_expiry');
+            // Save current URL to redirect back after login
+            sessionStorage.setItem('redirectAfterLogin', window.location.href);
+            // Redirect to login
+            window.location.href = 'index.php';
+        });
+    })();
+
+    // Also run the standard auth check on page load
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Set greeting
+        updatePageGreeting();
+        
+        try {
+            // Load user profile using the utils.js function
+            await loadUserProfile();
+        } catch (error) {
+            console.error('Failed to load user profile:', error);
+        }
+    });
+
     // Configuration
     const apiBaseUrl = 'https://auth.kdj.lk/api/v1';
     
@@ -410,14 +483,49 @@ $additional_scripts = <<<HTML
         }
     }
     
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        // Update time-based greeting
-        updatePageGreeting();
-        
-        // Load user profile data
-        loadUserProfile();
+    // Mobile sidebar toggle
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileSidebarContent = document.getElementById('mobileSidebarContent');
+    const closeMobileSidebar = document.getElementById('closeMobileSidebar');
+    
+    mobileSidebarToggle.addEventListener('click', function() {
+        mobileSidebar.classList.remove('hidden');
+        setTimeout(() => {
+            mobileSidebarContent.classList.remove('-translate-x-full');
+        }, 10);
     });
+    
+    function closeSidebar() {
+        mobileSidebarContent.classList.add('-translate-x-full');
+        setTimeout(() => {
+            mobileSidebar.classList.add('hidden');
+        }, 300);
+    }
+    
+    closeMobileSidebar.addEventListener('click', closeSidebar);
+    
+    mobileSidebar.addEventListener('click', function(e) {
+        if (e.target === mobileSidebar) {
+            closeSidebar();
+        }
+    });
+    
+    // Sidebar logout
+    const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
+    const mobileSidebarLogoutBtn = document.getElementById('mobileSidebarLogoutBtn');
+    
+    function handleSidebarLogout() {
+        handleLogout();
+    }
+    
+    if (sidebarLogoutBtn) {
+        sidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
+    }
+    
+    if (mobileSidebarLogoutBtn) {
+        mobileSidebarLogoutBtn.addEventListener('click', handleSidebarLogout);
+    }
 </script>
 HTML;
 

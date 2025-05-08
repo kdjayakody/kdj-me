@@ -256,6 +256,9 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
         const authToken = sessionStorage.getItem('auth_token');
         if (authToken) {
             defaultHeaders['Authorization'] = `Bearer ${authToken}`;
+            console.log('Using auth token:', `Bearer ${authToken.substring(0, 10)}...`);
+        } else {
+            console.warn('No auth token found in sessionStorage for API request to', endpoint);
         }
         
         // Create fetch config
@@ -273,12 +276,16 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
         
         // Check if token needs refresh before making request
         if (isTokenExpiringSoon() && endpoint !== '/auth/refresh-token') {
+            console.log('Token is expiring soon, attempting to refresh');
             await refreshAuthToken();
             
             // Update authorization header with new token
             const newToken = sessionStorage.getItem('auth_token');
             if (newToken) {
                 config.headers['Authorization'] = `Bearer ${newToken}`;
+                console.log('Using refreshed auth token');
+            } else {
+                console.warn('Failed to refresh token');
             }
         }
         
@@ -287,16 +294,30 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         config.signal = controller.signal;
         
+        // Log request details (in dev mode)
+        console.log(`API Request: ${API_BASE_URL}${endpoint}`, {
+            method: config.method || 'GET',
+            includesAuth: !!config.headers['Authorization'],
+            includesCredentials: config.credentials === 'include'
+        });
+        
         // Make the request
         const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
         clearTimeout(timeoutId); // Clear timeout on successful response
         
+        console.log(`API Response: ${endpoint}`, {
+            status: response.status,
+            ok: response.ok
+        });
+        
         // Handle unauthorized error by trying to refresh token once
         if (response.status === 401 && endpoint !== '/auth/refresh-token' && endpoint !== '/auth/login') {
+            console.log('Received 401 Unauthorized, attempting token refresh');
             // Try to refresh the token
             const refreshed = await refreshAuthToken();
             
             if (refreshed) {
+                console.log('Token refreshed successfully, retrying original request');
                 // Retry the original request with new token
                 const newToken = sessionStorage.getItem('auth_token');
                 if (newToken) {
@@ -311,8 +332,14 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
                 const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, config);
                 clearTimeout(retryTimeoutId);
                 
+                console.log('Retry response:', {
+                    status: retryResponse.status,
+                    ok: retryResponse.ok
+                });
+                
                 if (retryResponse.status === 401) {
                     // Still unauthorized after token refresh, redirect to login
+                    console.error('Still unauthorized after token refresh');
                     handleAuthFailure();
                     throw new Error('Session expired. Please log in again.');
                 }
@@ -320,6 +347,7 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
                 return retryResponse;
             } else {
                 // Token refresh failed, redirect to login
+                console.error('Token refresh failed, redirecting to login');
                 handleAuthFailure();
                 throw new Error('Session expired. Please log in again.');
             }
@@ -328,6 +356,7 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
         return response;
     } catch (error) {
         if (error.name === 'AbortError') {
+            console.error('Request timed out:', endpoint);
             throw new Error('Request timeout. Please check your internet connection and try again.');
         }
         
@@ -340,6 +369,7 @@ async function apiRequest(endpoint, options = {}, includeCredentials = true) {
  * Handle authentication failure by clearing tokens and redirecting to login
  */
 function handleAuthFailure() {
+    console.log('Handling authentication failure');
     // Clear all authentication data
     sessionStorage.removeItem('auth_token');
     sessionStorage.removeItem('token_expiry');
@@ -347,6 +377,8 @@ function handleAuthFailure() {
     localStorage.removeItem('refresh_token');
     
     // Save current URL to redirect back after login
+    const currentPage = window.location.pathname;
+    console.log('Saving current page for redirect:', currentPage);
     sessionStorage.setItem('redirectAfterLogin', window.location.href);
     
     // Redirect to login page
@@ -372,9 +404,13 @@ function isTokenExpiringSoon() {
 async function refreshAuthToken() {
     // Try to get refresh token from session storage first, then local storage
     const refreshToken = sessionStorage.getItem('refresh_token') || localStorage.getItem('refresh_token');
-    if (!refreshToken) return false;
+    if (!refreshToken) {
+        console.warn('No refresh token found in storage');
+        return false;
+    }
     
     try {
+        console.log('Attempting to refresh token');
         const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
             method: 'POST',
             headers: {
@@ -395,11 +431,13 @@ async function refreshAuthToken() {
         if (data.access_token) {
             // Store the new token
             sessionStorage.setItem('auth_token', data.access_token);
+            console.log('Stored new access token in sessionStorage');
             
             // Update expiry time
             if (data.expires_in) {
                 const expiryTime = Date.now() + (data.expires_in * 1000);
                 sessionStorage.setItem('token_expiry', expiryTime.toString());
+                console.log('Updated token expiry time');
             }
             
             // Store refresh token if provided
@@ -407,14 +445,17 @@ async function refreshAuthToken() {
                 // Keep it in the same storage it was found in
                 if (localStorage.getItem('refresh_token')) {
                     localStorage.setItem('refresh_token', data.refresh_token);
+                    console.log('Updated refresh token in localStorage');
                 } else {
                     sessionStorage.setItem('refresh_token', data.refresh_token);
+                    console.log('Updated refresh token in sessionStorage');
                 }
             }
             
             return true;
         }
         
+        console.warn('No access token in refresh response');
         return false;
     } catch (error) {
         console.error('Token refresh error:', error);
@@ -468,16 +509,22 @@ function getCSRFToken() {
 async function checkUserAuthentication() {
     try {
         const authToken = sessionStorage.getItem('auth_token');
-        if (!authToken) return null;
+        if (!authToken) {
+            console.log('No auth token in sessionStorage, user is not authenticated');
+            return null;
+        }
         
+        console.log('Found auth token, checking if valid by fetching user profile');
         const response = await apiRequest('/users/me', {
             method: 'GET'
         });
         
         if (!response.ok) {
+            console.warn('User profile request failed, token may be invalid');
             return null;
         }
         
+        console.log('User profile request successful, user is authenticated');
         return await response.json();
     } catch (error) {
         console.error('Authentication check failed:', error);
@@ -490,13 +537,16 @@ async function checkUserAuthentication() {
  * @returns {Promise<object|null>} - The user data if logged in, null otherwise
  */
 async function requireAuthentication() {
+    console.log('Checking authentication for protected page');
     const userData = await checkUserAuthentication();
     if (!userData) {
+        console.log('User is not authenticated, redirecting to login');
         // Save current URL to redirect back after login
         sessionStorage.setItem('redirectAfterLogin', window.location.href);
         window.location.href = 'index.php';
         return null;
     }
+    console.log('User is authenticated, continuing to protected page');
     return userData;
 }
 
@@ -549,11 +599,13 @@ async function handleLogout() {
  * Clear all authentication data from storage
  */
 function clearAuthData() {
+    console.log('Clearing all authentication data');
     sessionStorage.removeItem('auth_token');
     sessionStorage.removeItem('token_expiry');
     sessionStorage.removeItem('refresh_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_id');
+    sessionStorage.removeItem('user_id');
 }
 
 /**
@@ -562,15 +614,21 @@ function clearAuthData() {
  * @param {boolean} rememberMe - Whether to remember the user
  */
 function storeAuthData(data, rememberMe) {
+    console.log('Storing authentication data', { rememberMe, hasAccessToken: !!data.access_token });
+    
     // Access token always goes in session storage
     if (data.access_token) {
         sessionStorage.setItem('auth_token', data.access_token);
+        console.log('Stored access token in sessionStorage');
         
         // Store token expiry if provided
         if (data.expires_in) {
             const expiryTime = Date.now() + (data.expires_in * 1000);
             sessionStorage.setItem('token_expiry', expiryTime.toString());
+            console.log('Stored token expiry time:', new Date(expiryTime).toISOString());
         }
+    } else {
+        console.warn('No access token provided in login response');
     }
     
     // Refresh token goes in localStorage if rememberMe, otherwise sessionStorage
@@ -578,18 +636,24 @@ function storeAuthData(data, rememberMe) {
         if (rememberMe) {
             localStorage.setItem('refresh_token', data.refresh_token);
             sessionStorage.removeItem('refresh_token');
+            console.log('Stored refresh token in localStorage (remember me)');
         } else {
             sessionStorage.setItem('refresh_token', data.refresh_token);
             localStorage.removeItem('refresh_token');
+            console.log('Stored refresh token in sessionStorage');
         }
+    } else {
+        console.warn('No refresh token provided in login response');
     }
     
     // Store user ID if provided
     if (data.user_id) {
         if (rememberMe) {
             localStorage.setItem('user_id', data.user_id);
+            console.log('Stored user ID in localStorage');
         } else {
             sessionStorage.setItem('user_id', data.user_id);
+            console.log('Stored user ID in sessionStorage');
         }
     }
 }
@@ -803,8 +867,10 @@ function checkAuthForProtectedPages() {
     ];
     
     const currentPage = window.location.pathname.split('/').pop();
+    console.log('Current page:', currentPage);
     
     if (protectedPages.includes(currentPage)) {
+        console.log('This is a protected page, checking authentication');
         // Check if user is authenticated
         requireAuthentication();
     }
@@ -816,16 +882,40 @@ function checkAuthForProtectedPages() {
 function handleRedirectAfterLogin() {
     const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
     if (redirectAfterLogin && window.location.pathname.includes('index.php')) {
+        console.log('Found redirectAfterLogin:', redirectAfterLogin);
         // Check if already logged in
         checkUserAuthentication().then(userData => {
             if (userData) {
+                console.log('User is logged in, redirecting to:', redirectAfterLogin);
                 // User is logged in, redirect to the saved URL
                 sessionStorage.removeItem('redirectAfterLogin');
                 window.location.href = redirectAfterLogin;
+            } else {
+                console.log('User is not logged in, staying on login page');
             }
         });
     }
 }
 
+// Debug function for diagnosing authentication problems
+function debugAuth() {
+    console.group('Auth Debug Info');
+    console.log('SessionStorage auth_token:', sessionStorage.getItem('auth_token') ? 'Present' : 'Missing');
+    console.log('SessionStorage token_expiry:', sessionStorage.getItem('token_expiry'));
+    console.log('SessionStorage refresh_token:', sessionStorage.getItem('refresh_token') ? 'Present' : 'Missing');
+    console.log('LocalStorage refresh_token:', localStorage.getItem('refresh_token') ? 'Present' : 'Missing');
+    console.log('SessionStorage user_id:', sessionStorage.getItem('user_id'));
+    console.log('LocalStorage user_id:', localStorage.getItem('user_id'));
+    console.log('Current page:', window.location.pathname);
+    console.log('Redirect after login:', sessionStorage.getItem('redirectAfterLogin'));
+    console.groupEnd();
+}
+
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', initCommonPageFunctions);
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing common page functions');
+    initCommonPageFunctions();
+    
+    // Debug authentication status (will be visible in browser console)
+    debugAuth();
+});

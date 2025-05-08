@@ -36,50 +36,8 @@ $additional_head = <<<HTML
 </style>
 HTML;
 
-// Check if user is already logged in with JavaScript
-echo "<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Check if there's a valid auth token
-        const authToken = sessionStorage.getItem('auth_token');
-        
-        if (authToken) {
-            // Verify token by making an API call
-            fetch('{$apiBaseUrl}/users/me', {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer \${authToken}`
-                },
-                credentials: 'include'
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                }
-                throw new Error('Invalid token');
-            })
-            .then(userData => {
-                // Check if there's a specific redirect URL in sessionStorage
-                const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-                
-                if (redirectAfterLogin) {
-                    // User is logged in, redirect to the saved URL
-                    sessionStorage.removeItem('redirectAfterLogin');
-                    window.location.href = redirectAfterLogin;
-                } else {
-                    // No saved redirect, go to dashboard
-                    window.location.href = 'dashboard.php';
-                }
-            })
-            .catch(error => {
-                console.error('Auth check error:', error);
-                // Clear invalid token
-                sessionStorage.removeItem('auth_token');
-                sessionStorage.removeItem('token_expiry');
-            });
-        }
-    });
-</script>";
+// Remove previous redirect check - we'll handle this in JavaScript
+// to make sure authentication works correctly
 
 // Include header
 include 'header.php';
@@ -205,11 +163,211 @@ $additional_scripts = <<<HTML
         if (redirectURL) {
             // Store the redirect URL for after login
             sessionStorage.setItem('redirectAfterLogin', decodeURIComponent(redirectURL));
+            console.log('Saved redirect URL from query param:', decodeURIComponent(redirectURL));
         }
     }
     
     // Run it when page loads
     checkForRedirectInURL();
+    
+    // Helper Functions for login form
+    function validateInputs(email, password) {
+        let isValid = true;
+        clearMessages(); // Clear previous errors first
+        
+        if (!email) {
+            showInputError(emailErrorEl, 'ඊමේල් ලිපිනය අවශ්‍යයි.');
+            isValid = false;
+        } else if (!isValidEmail(email)) {
+            showInputError(emailErrorEl, 'කරුණාකර වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.');
+            isValid = false;
+        }
+        
+        if (!password) {
+            showInputError(passwordErrorEl, 'මුරපදය අවශ්‍යයි.');
+            isValid = false;
+        }
+        return isValid;
+    }
+    
+    function handleApiError(responseData, status) {
+        let errorMessage = 'ඇතුල් වීමට නොහැක. ';
+        if (responseData?.detail) {
+            if (typeof responseData.detail === 'string') {
+                if (responseData.detail.includes('Invalid email or password') || responseData.detail.includes('INVALID_LOGIN_CREDENTIALS')) {
+                    errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
+                    showInputError(emailErrorEl, ' '); emailInput.focus();
+                    showInputError(passwordErrorEl, ' ');
+                } else if (responseData.detail.includes('Account temporarily locked')) {
+                    errorMessage = responseData.detail; // Show lockout message from API
+                } else if (responseData.detail.includes('Account disabled')) {
+                    errorMessage = 'ඔබගේ ගිණුම අක්‍රිය කර ඇත.';
+                } else {
+                    errorMessage += responseData.detail;
+                }
+            } else {
+                errorMessage += JSON.stringify(responseData.detail);
+            }
+        } else {
+            errorMessage += `සේවාදායකයේ දෝෂයක් (කේතය: \${status})`;
+        }
+        showMessage(errorMessage, 'error');
+    }
+    
+    function handleNetworkError(error) {
+        console.error('Login Fetch Error:', error);
+        showMessage('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සහ කරන්න.', 'error');
+    }
+    
+    function showMessage(msg, type) {
+        messageArea.textContent = msg;
+        // Base classes + type specific classes
+        let typeClasses = 'border ';
+        if (type === 'success') {
+            typeClasses += 'bg-green-50 border-green-300 text-green-700';
+        } else if (type === 'error') {
+            typeClasses += 'bg-red-50 border-red-300 text-red-700';
+        } else { // Info or default
+            typeClasses += 'bg-blue-50 border-blue-300 text-blue-700';
+        }
+        messageArea.className = `my-6 p-3 rounded-md text-center font-medium text-sm \${typeClasses}`;
+        messageArea.style.display = 'block';
+        
+        // Make sure the message is visible
+        messageArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+    function showInputError(element, message) {
+        if (!element) return;
+        element.textContent = message;
+        element.style.display = 'block';
+        const input = element.closest('div')?.querySelector('input'); // Find input in parent div
+        if (input) {
+            input.classList.add('border-red-500'); // Add red border
+            input.classList.remove('focus:border-kdj-red','focus:ring-kdj-red'); // Remove default focus
+            input.classList.add('focus:border-red-500','focus:ring-red-500'); // Add red focus
+        }
+    }
+    
+    function clearMessages() {
+        messageArea.style.display = 'none';
+        messageArea.textContent = '';
+        if (emailErrorEl) emailErrorEl.style.display = 'none';
+        if (passwordErrorEl) passwordErrorEl.style.display = 'none';
+        
+        // Remove red borders and restore default focus
+        [emailInput, passwordInput].forEach(input => {
+            input?.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
+            input?.classList.add('focus:border-kdj-red', 'focus:ring-kdj-red');
+        });
+    }
+    
+    function disableSubmitButton(text) {
+        submitButton.disabled = true;
+        // Add spinner using font awesome
+        submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i><span>\${text}</span>`;
+    }
+    
+    function enableSubmitButton() {
+        submitButton.disabled = false;
+        // Restore original button text/structure
+        submitButton.innerHTML = `<span id="buttonText">ඇතුල් වන්න</span>`;
+    }
+    
+    // Form submission
+    loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        clearMessages();
+        disableSubmitButton('සකසමින්...'); // Show loading state
+        
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        const rememberMe = rememberMeInput.checked;
+        
+        // Basic Client Validation
+        let isValid = validateInputs(email, password);
+        if (!isValid) {
+            enableSubmitButton();
+            return;
+        }
+        
+        // Clear any previous auth data before attempting login
+        sessionStorage.removeItem('auth_token');
+        sessionStorage.removeItem('token_expiry');
+        
+        // API Call
+        try {
+            console.log('Attempting login for:', email);
+            showLoading();
+            
+            const response = await fetch(`\${apiBaseUrl}/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ email, password, remember_me: rememberMe }),
+                credentials: 'include'
+            });
+            
+            console.log('Login response status:', response.status);
+            const data = await response.json();
+            
+            if (response.ok) {
+                console.log('Login successful, handling response');
+                handleLoginSuccess(data, rememberMe);
+            } else {
+                hideLoading();
+                handleApiError(data, response.status);
+                enableSubmitButton();
+            }
+        } catch (error) {
+            hideLoading();
+            console.error('Login error:', error);
+            handleNetworkError(error);
+            enableSubmitButton();
+        }
+    });
+
+    function handleLoginSuccess(data, rememberMe) {
+        showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
+        
+        // Store authentication data
+        storeAuthData(data, rememberMe);
+        
+        // Debug - verify token was stored
+        console.log('Auth token stored:', !!sessionStorage.getItem('auth_token'));
+        console.log('Token expiry stored:', !!sessionStorage.getItem('token_expiry'));
+        
+        // Check if MFA is required
+        if (data.mfa_required && data.mfa_methods?.length > 0) {
+            console.log('MFA required, redirecting to MFA page');
+            // Redirect to MFA page
+            setTimeout(() => { 
+                window.location.href = `mfa.php?methods=\${data.mfa_methods.join(',')}`; 
+            }, 1000);
+            return;
+        }
+        
+        // Get the redirect URL if available, otherwise use dashboard
+        const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+        console.log('Redirect after login:', redirectAfterLogin || 'dashboard.php');
+        
+        if (redirectAfterLogin) {
+            // Clear the redirect URL before navigating
+            sessionStorage.removeItem('redirectAfterLogin');
+            setTimeout(() => { 
+                console.log('Redirecting to:', redirectAfterLogin);
+                window.location.href = redirectAfterLogin; 
+            }, 1000);
+        } else {
+            // Default to dashboard
+            setTimeout(() => { 
+                console.log('Redirecting to dashboard');
+                window.location.href = REDIRECT_URL; 
+            }, 1000);
+        }
+    }
     
     // Google Sign-In Handler with improved error handling
     async function signInWithGoogle() {
@@ -402,184 +560,6 @@ $additional_scripts = <<<HTML
                 });
         }
     }
-
-    // Form submission
-    loginForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        clearMessages();
-        disableSubmitButton('සකසමින්...'); // Show loading state
-        
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-        const rememberMe = rememberMeInput.checked;
-        
-        // Basic Client Validation
-        let isValid = validateInputs(email, password);
-        if (!isValid) {
-            enableSubmitButton();
-            return;
-        }
-        
-        // API Call
-        try {
-            const response = await fetch(`\${apiBaseUrl}/auth/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ email, password, remember_me: rememberMe }),
-                credentials: 'include'
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                handleLoginSuccess(data, rememberMe);
-            } else {
-                handleApiError(data, response.status);
-                enableSubmitButton();
-            }
-        } catch (error) {
-            handleNetworkError(error);
-            enableSubmitButton();
-        }
-    });
-    
-    // Helper Functions
-    function validateInputs(email, password) {
-        let isValid = true;
-        clearMessages(); // Clear previous errors first
-        
-        if (!email) {
-            showInputError(emailErrorEl, 'ඊමේල් ලිපිනය අවශ්‍යයි.');
-            isValid = false;
-        } else if (!isValidEmail(email)) {
-            showInputError(emailErrorEl, 'කරුණාකර වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.');
-            isValid = false;
-        }
-        
-        if (!password) {
-            showInputError(passwordErrorEl, 'මුරපදය අවශ්‍යයි.');
-            isValid = false;
-        }
-        return isValid;
-    }
-    
-    function handleLoginSuccess(data, rememberMe) {
-        showMessage('සාර්ථකව ඇතුල් විය! යොමු කරමින්...', 'success');
-        storeAuthData(data, rememberMe);
-        
-        // Check if MFA is required
-        if (data.mfa_required && data.mfa_methods?.length > 0) {
-            // Redirect to MFA page
-            setTimeout(() => { 
-                window.location.href = `mfa.php?methods=\${data.mfa_methods.join(',')}`; 
-            }, 1000);
-            return;
-        }
-        
-        // Get the redirect URL if available, otherwise use dashboard
-        const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
-        
-        if (redirectAfterLogin) {
-            // Clear the redirect URL before navigating
-            sessionStorage.removeItem('redirectAfterLogin');
-            setTimeout(() => { window.location.href = redirectAfterLogin; }, 1000);
-        } else {
-            // Default to dashboard
-            setTimeout(() => { window.location.href = REDIRECT_URL; }, 1000);
-        }
-    }
-    
-    function handleApiError(responseData, status) {
-        let errorMessage = 'ඇතුල් වීමට නොහැක. ';
-        if (responseData?.detail) {
-            if (typeof responseData.detail === 'string') {
-                if (responseData.detail.includes('Invalid email or password') || responseData.detail.includes('INVALID_LOGIN_CREDENTIALS')) {
-                    errorMessage = 'වලංගු නොවන ඊමේල් හෝ මුරපදය.';
-                    showInputError(emailErrorEl, ' '); emailInput.focus();
-                    showInputError(passwordErrorEl, ' ');
-                } else if (responseData.detail.includes('Account temporarily locked')) {
-                    errorMessage = responseData.detail; // Show lockout message from API
-                } else if (responseData.detail.includes('Account disabled')) {
-                    errorMessage = 'ඔබගේ ගිණුම අක්‍රිය කර ඇත.';
-                } else {
-                    errorMessage += responseData.detail;
-                }
-            } else {
-                errorMessage += JSON.stringify(responseData.detail);
-            }
-        } else {
-            errorMessage += `සේවාදායකයේ දෝෂයක් (කේතය: \${status})`;
-        }
-        showMessage(errorMessage, 'error');
-    }
-    
-    function handleNetworkError(error) {
-        console.error('Login Fetch Error:', error);
-        showMessage('ඉල්ලීම යැවීමේදී දෝෂයක් ඇතිවිය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සහ කරන්න.', 'error');
-    }
-    
-    function showMessage(msg, type) {
-        messageArea.textContent = msg;
-        // Base classes + type specific classes
-        let typeClasses = 'border ';
-        if (type === 'success') {
-            typeClasses += 'bg-green-50 border-green-300 text-green-700';
-        } else if (type === 'error') {
-            typeClasses += 'bg-red-50 border-red-300 text-red-700';
-        } else { // Info or default
-            typeClasses += 'bg-blue-50 border-blue-300 text-blue-700';
-        }
-        messageArea.className = `my-6 p-3 rounded-md text-center font-medium text-sm \${typeClasses}`;
-        messageArea.style.display = 'block';
-        
-        // Make sure the message is visible
-        messageArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-    
-    function showInputError(element, message) {
-        if (!element) return;
-        element.textContent = message;
-        element.style.display = 'block';
-        const input = element.closest('div')?.querySelector('input'); // Find input in parent div
-        if (input) {
-            input.classList.add('border-red-500'); // Add red border
-            input.classList.remove('focus:border-kdj-red','focus:ring-kdj-red'); // Remove default focus
-            input.classList.add('focus:border-red-500','focus:ring-red-500'); // Add red focus
-        }
-    }
-    
-    function clearMessages() {
-        messageArea.style.display = 'none';
-        messageArea.textContent = '';
-        if (emailErrorEl) emailErrorEl.style.display = 'none';
-        if (passwordErrorEl) passwordErrorEl.style.display = 'none';
-        
-        // Remove red borders and restore default focus
-        [emailInput, passwordInput].forEach(input => {
-            input?.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
-            input?.classList.add('focus:border-kdj-red', 'focus:ring-kdj-red');
-        });
-    }
-    
-    function disableSubmitButton(text) {
-        submitButton.disabled = true;
-        // Add spinner using font awesome
-        submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i><span>\${text}</span>`;
-    }
-    
-    function enableSubmitButton() {
-        submitButton.disabled = false;
-        // Restore original button text/structure
-        submitButton.innerHTML = `<span id="buttonText">ඇතුල් වන්න</span>`;
-    }
-    
-    function isValidEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(String(email).toLowerCase());
-    }
     
     // Save referrer information for redirecting back after login
     function checkReferrer() {
@@ -592,40 +572,7 @@ $additional_scripts = <<<HTML
         )) {
             // If referred from one of our other sites, store it for redirect after login
             sessionStorage.setItem('redirectAfterLogin', referrer);
-        }
-    }
-    
-    // Store authentication data with proper handling
-    function storeAuthData(data, rememberMe) {
-        // Access token always goes in session storage
-        if (data.access_token) {
-            sessionStorage.setItem('auth_token', data.access_token);
-            
-            // Store token expiry if provided
-            if (data.expires_in) {
-                const expiryTime = Date.now() + (data.expires_in * 1000);
-                sessionStorage.setItem('token_expiry', expiryTime.toString());
-            }
-        }
-        
-        // Refresh token goes in localStorage if rememberMe, otherwise sessionStorage
-        if (data.refresh_token) {
-            if (rememberMe) {
-                localStorage.setItem('refresh_token', data.refresh_token);
-                sessionStorage.removeItem('refresh_token');
-            } else {
-                sessionStorage.setItem('refresh_token', data.refresh_token);
-                localStorage.removeItem('refresh_token');
-            }
-        }
-        
-        // Store user ID if provided
-        if (data.user_id) {
-            if (rememberMe) {
-                localStorage.setItem('user_id', data.user_id);
-            } else {
-                sessionStorage.setItem('user_id', data.user_id);
-            }
+            console.log('Saved referrer for redirect:', referrer);
         }
     }
     
@@ -634,13 +581,67 @@ $additional_scripts = <<<HTML
         googleSignInButton.addEventListener('click', signInWithGoogle);
     }
     
-    // Initialize when the page loads
+    // Check if there's a valid auth token on page load 
+    // And redirect if already logged in
     document.addEventListener('DOMContentLoaded', function() {
+        console.log('Checking for existing auth token');
+        
+        // Debug - show authentication status
+        debugAuth();
+        
         // Check for any Firebase auth redirect results
         checkRedirectResult();
         
         // Check referrer for redirect after login
         checkReferrer();
+        
+        const authToken = sessionStorage.getItem('auth_token');
+        if (authToken) {
+            console.log('Found existing auth token, verifying...');
+            
+            // Verify token by making an API call
+            fetch(`\${apiBaseUrl}/users/me`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer \${authToken}`
+                },
+                credentials: 'include'
+            })
+            .then(response => {
+                console.log('Token verification status:', response.status);
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('Invalid token');
+            })
+            .then(userData => {
+                console.log('User is already logged in, checking for redirect');
+                
+                // Check if there's a specific redirect URL in sessionStorage
+                const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+                
+                if (redirectAfterLogin) {
+                    // User is logged in, redirect to the saved URL
+                    console.log('Redirecting to:', redirectAfterLogin);
+                    sessionStorage.removeItem('redirectAfterLogin');
+                    window.location.href = redirectAfterLogin;
+                } else {
+                    // No saved redirect, go to dashboard
+                    console.log('Redirecting to dashboard');
+                    window.location.href = 'dashboard.php';
+                }
+            })
+            .catch(error => {
+                console.error('Auth check error:', error);
+                // Clear invalid token
+                console.log('Clearing invalid token');
+                sessionStorage.removeItem('auth_token');
+                sessionStorage.removeItem('token_expiry');
+            });
+        } else {
+            console.log('No auth token found, user needs to log in');
+        }
     });
 </script>
 HTML;
